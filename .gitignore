@@ -19,3 +19,9 @@ __pycache__/
 
 # MAGI agent memory (local working notes)
 .claude/magi/
+
+# Terraform (commit .terraform.lock.hcl)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars

@@ -50,6 +50,17 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
 GitHub Actions (`.github/workflows/ci.yml`) runs the tests on Python 3.12 and 3.14, applies the Alembic
 migrations to a real Postgres, builds the Angular frontend, and builds the Docker image.
 
+## Hosting (Azure)
+`infra/` holds Terraform for Azure: Container Apps (scale to zero), Container Registry, and Postgres Flexible
+Server (B1ms). CI only runs `terraform fmt -check` and `validate`; nothing is applied or deployed yet. A deploy
+workflow is the next step. Validate locally with
+`terraform -chdir=infra init -backend=false && terraform -chdir=infra validate`.
+
+Accepted risks and caveats:
+- Postgres is publicly reachable (with the "allow Azure services" firewall rule); there is no VNet.
+- The first apply fails until an image exists in ACR.
+- Use an alphanumeric Postgres admin password: `alembic/env.py` cannot handle `%` in the database URL.
+
 ## Run
 1. Create and activate a virtual environment.
 2. Install dependencies:
