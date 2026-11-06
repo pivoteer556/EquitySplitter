@@ -11,3 +11,8 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI idiom: Depends() in a default argument is intentional (B008). Whitelist the call, not the rule.
 extend-immutable-calls = ["fastapi.Depends"]
+
+[tool.mypy]
+python_version = "3.12"
+# packages (not files): `mypy app` double-maps modules (db.session vs app.db.session); this works with bare `mypy`.
+packages = ["app"]

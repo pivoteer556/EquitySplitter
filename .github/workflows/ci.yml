@@ -26,6 +26,9 @@ jobs:
       # Lint once (not per matrix leg); ruff config lives in pyproject.toml.
       - run: ruff check .
         if: matrix.python-version == '3.12'
+      # Type-check once; mypy config (packages = ["app"]) lives in pyproject.toml.
+      - run: mypy
+        if: matrix.python-version == '3.12'
 
   migrations:
     runs-on: ubuntu-latest

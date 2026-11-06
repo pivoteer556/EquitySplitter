@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import NoReturn
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -17,6 +18,7 @@ from app.schemas.auth import (
     InstitutionBootstrapResponse,
     InstitutionRevokeRequest,
 )
+from app.schemas.institution import InstitutionRead, InstitutionUserRead
 from app.services.auth import (
     accept_invite,
     bootstrap_institution,
@@ -45,7 +47,7 @@ def _login_key(scope: str, request: Request, email: str) -> str:
     return f"{scope}:{_client_ip(request)}:{email.strip().lower()}"
 
 
-def _fail_login(db: Session, key: str, status_code: int, detail: str):
+def _fail_login(db: Session, key: str, status_code: int, detail: str) -> NoReturn:
     login_limiter.record_attempt(db, key)
     raise HTTPException(status_code=status_code, detail=detail)
 
@@ -84,8 +86,8 @@ def institution_bootstrap(payload: InstitutionBootstrapRequest, request: Request
     )
     return InstitutionBootstrapResponse(
         accessToken=token,
-        institution=institution,
-        institutionUser=officer,
+        institution=InstitutionRead.model_validate(institution),
+        institutionUser=InstitutionUserRead.model_validate(officer),
     )
 
 
