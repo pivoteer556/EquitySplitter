@@ -24,6 +24,11 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   redeploy; the trade-off is that a database leak exposes signing keys, so the DB must be treated as a
   secret store. Tokens are also pinned to a server-side `lastTokenIssuedAt`, so only the latest token per account
   is accepted and institution users can be revoked.
+- **Login rate limiting** (`/auth/login`, `/auth/institution/login`): 5 failed attempts per 60 s per email+IP return
+  HTTP 429 with `Retry-After`. It is in-memory per process, so it does not span multiple replicas or survive a
+  restart (move the counters to Redis/DB to scale out). The key uses the direct socket IP; there is no
+  `X-Forwarded-For` handling, so behind a reverse proxy clients effectively share one IP. `/auth/register` and
+  `/auth/institution/bootstrap` are not limited.
 - Known gap: invited owners are created without a password and there is no invite-accept / password-set flow yet.
 
 ## Tests and CI

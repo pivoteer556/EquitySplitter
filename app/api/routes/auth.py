@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import Principal, require_institution_user
@@ -23,8 +23,29 @@ from app.services.auth import (
     validate_password_policy,
     verify_and_upgrade_password,
 )
+from app.services.rate_limit import login_limiter
 
 router = APIRouter(prefix="/auth")
+
+
+def _login_key(scope: str, request: Request, email: str) -> str:
+    ip = request.client.host if request.client else "unknown"
+    return f"{scope}:{ip}:{email.strip().lower()}"
+
+
+def _fail_login(key: str, status_code: int, detail: str):
+    login_limiter.record_failure(key)
+    raise HTTPException(status_code=status_code, detail=detail)
+
+
+def _enforce_login_limit(key: str) -> None:
+    wait = login_limiter.retry_after(key)
+    if wait > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts",
+            headers={"Retry-After": str(wait)},
+        )
 
 
 @router.post("/institution/bootstrap", response_model=InstitutionBootstrapResponse, status_code=status.HTTP_201_CREATED)
@@ -58,23 +79,29 @@ def register(payload: AuthRegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=AuthTokenResponse)
-def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
+def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
+    key = _login_key("user", request, payload.email)
+    _enforce_login_limit(key)
     user = db.query(User).filter(User.email == payload.email).first()
     if user is None or user.passwordHash is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
+        _fail_login(key, status.HTTP_403_FORBIDDEN, "Password reset required")
     if not verify_and_upgrade_password(db, user, payload.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        _fail_login(key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    login_limiter.reset(key)
     token = refresh_and_store_user_token(db, user)
     return AuthTokenResponse(accessToken=token)
 
 
 @router.post("/institution/login", response_model=AuthTokenResponse)
-def institution_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
+def institution_login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
+    key = _login_key("institution", request, payload.email)
+    _enforce_login_limit(key)
     inst_user = db.query(InstitutionUser).filter(InstitutionUser.email == payload.email).first()
     if inst_user is None or inst_user.passwordHash is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
+        _fail_login(key, status.HTTP_403_FORBIDDEN, "Password reset required")
     if not verify_and_upgrade_password(db, inst_user, payload.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        _fail_login(key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    login_limiter.reset(key)
     token = refresh_and_store_institution_token(db, inst_user)
     return AuthTokenResponse(accessToken=token)
 
