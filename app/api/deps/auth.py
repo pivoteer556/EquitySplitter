@@ -1,0 +1,80 @@
+from dataclasses import dataclass
+from uuid import UUID
+
+from fastapi import Depends, Header, HTTPException, Response, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models import InstitutionUser, User
+from app.services.auth import (
+    decode_token,
+    ensure_institution_not_revoked,
+    ensure_user_property_scope,
+    refresh_and_store_institution_token,
+    refresh_and_store_user_token,
+    validate_active_token_iat,
+)
+
+
+@dataclass
+class Principal:
+    user_id: UUID
+    user_type: str
+    institution_id: UUID | None = None
+
+
+def _extract_bearer(authorization: str | None) -> str:
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
+    return authorization.split(" ", 1)[1].strip()
+
+
+def require_user(
+    response: Response,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    token = _extract_bearer(authorization)
+    claims = decode_token(db, token)
+    if claims.get("userType") != "user":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
+
+    user_id = UUID(claims["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    validate_active_token_iat(user.lastTokenIssuedAt, claims.get("iat"))
+    refreshed = refresh_and_store_user_token(db, user)
+    response.headers["X-Refreshed-Token"] = refreshed
+    return Principal(user_id=user.id, user_type="user")
+
+
+def require_institution_user(
+    response: Response,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    token = _extract_bearer(authorization)
+    claims = decode_token(db, token)
+    if claims.get("userType") != "institution_user":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
+
+    user_id = UUID(claims["sub"])
+    inst_user = db.query(InstitutionUser).filter(InstitutionUser.id == user_id).first()
+    if inst_user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Institution user not found")
+
+    ensure_institution_not_revoked(db, inst_user.id)
+    validate_active_token_iat(inst_user.lastTokenIssuedAt, claims.get("iat"))
+    refreshed = refresh_and_store_institution_token(db, inst_user)
+    response.headers["X-Refreshed-Token"] = refreshed
+    return Principal(user_id=inst_user.id, user_type="institution_user", institution_id=inst_user.institutionId)
+
+
+def require_user_property_scope(
+    property_id: UUID,
+    principal: Principal,
+    db: Session,
+) -> None:
+    ensure_user_property_scope(db, principal.user_id, property_id)

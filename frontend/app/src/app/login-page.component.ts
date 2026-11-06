@@ -1,0 +1,72 @@
+import { CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+
+import { ApiService } from './api.service';
+
+@Component({
+  selector: 'app-login-page',
+  imports: [CommonModule, FormsModule],
+  templateUrl: './login-page.component.html',
+  styleUrl: './login-page.component.css',
+})
+export class LoginPageComponent {
+  institutionName = 'Atlas Lending';
+  officerName = 'Casey Officer';
+  officerEmail = 'casey.officer@example.com';
+  officerPassword = '';
+
+  loginEmail = '';
+  loginPassword = '';
+
+  error = '';
+  lastResponse = '';
+  loading = false;
+
+  constructor(
+    private readonly api: ApiService,
+    private readonly router: Router,
+  ) {}
+
+  bootstrapInstitution(): void {
+    this.error = '';
+    this.lastResponse = '';
+    this.loading = true;
+    this.api.bootstrapInstitution({
+      institutionName: this.institutionName,
+      officerName: this.officerName,
+      officerEmail: this.officerEmail,
+      officerPassword: this.officerPassword,
+    }).subscribe({
+      next: (res) => {
+        this.lastResponse = JSON.stringify(res, null, 2);
+        this.loading = false;
+        this.router.navigateByUrl('/workbench');
+      },
+      error: (err) => {
+        const e = err as { error?: unknown; message?: string };
+        this.error = JSON.stringify(e.error ?? e.message ?? err, null, 2);
+        this.loading = false;
+      },
+    });
+  }
+
+  login(): void {
+    this.error = '';
+    this.lastResponse = '';
+    this.loading = true;
+    this.api.institutionLogin(this.loginEmail, this.loginPassword).subscribe({
+      next: (res) => {
+        this.lastResponse = JSON.stringify(res, null, 2);
+        this.loading = false;
+        this.router.navigateByUrl('/workbench');
+      },
+      error: (err) => {
+        const e = err as { error?: unknown; message?: string };
+        this.error = JSON.stringify(e.error ?? e.message ?? err, null, 2);
+        this.loading = false;
+      },
+    });
+  }
+}

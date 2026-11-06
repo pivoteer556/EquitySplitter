@@ -1,0 +1,161 @@
+import base64
+import hashlib
+import hmac
+import re
+import secrets
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
+import jwt
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.models import AuthSecretState, Institution, InstitutionUser, TokenRevocation, User, UserProperty
+
+PASSWORD_POLICY = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$")
+
+
+def now_utc_seconds() -> datetime:
+    return datetime.now(timezone.utc).replace(microsecond=0)
+
+
+def _derive_secret(seed: str) -> str:
+    digest = hashlib.sha256(seed.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest).decode("utf-8")
+
+
+def ensure_secret_state(db: Session) -> AuthSecretState:
+    state = db.query(AuthSecretState).first()
+    if state is None:
+        state = AuthSecretState(currentSecret=_derive_secret(f"{settings.jwt_secret_seed}:{secrets.token_hex(16)}"), previousSecret=None, rotatedAt=now_utc_seconds())
+        db.add(state)
+        db.commit()
+        db.refresh(state)
+    return state
+
+
+def maybe_rotate_secrets(db: Session) -> None:
+    state = ensure_secret_state(db)
+    due_at = state.rotatedAt + timedelta(days=settings.jwt_rotation_days)
+    if now_utc_seconds() < due_at:
+        return
+    state.previousSecret = state.currentSecret
+    state.currentSecret = _derive_secret(f"{settings.jwt_secret_seed}:{secrets.token_hex(16)}")
+    state.rotatedAt = now_utc_seconds()
+    db.commit()
+
+
+def hash_password(password: str, salt: str) -> str:
+    return hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+
+
+def validate_password_policy(password: str) -> None:
+    if not PASSWORD_POLICY.match(password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password does not meet policy requirements")
+
+
+def create_salt() -> str:
+    return secrets.token_hex(16)
+
+
+def issue_token(db: Session, subject_id: UUID, user_type: str, institution_id: UUID | None = None) -> str:
+    state = ensure_secret_state(db)
+    iat_dt = now_utc_seconds()
+    claims = {
+        "sub": str(subject_id),
+        "userType": user_type,
+        "iat": int(iat_dt.timestamp()),
+        "exp": int((iat_dt + timedelta(minutes=settings.jwt_exp_minutes)).timestamp()),
+    }
+    if institution_id is not None:
+        claims["institutionId"] = str(institution_id)
+    return jwt.encode(claims, state.currentSecret, algorithm="HS256")
+
+
+def decode_token(db: Session, token: str) -> dict:
+    state = ensure_secret_state(db)
+    secrets_to_try = [state.currentSecret]
+    if state.previousSecret:
+        secrets_to_try.append(state.previousSecret)
+    for secret in secrets_to_try:
+        try:
+            return jwt.decode(token, secret, algorithms=["HS256"])
+        except jwt.PyJWTError:
+            continue
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+
+def verify_password(password: str, salt: str, password_hash: str) -> bool:
+    candidate = hash_password(password, salt)
+    return hmac.compare_digest(candidate, password_hash)
+
+
+def validate_active_token_iat(stored: datetime | None, token_iat: int | None) -> None:
+    if stored is None or token_iat is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token session")
+    if int(stored.timestamp()) != token_iat:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token no longer active")
+
+
+def refresh_and_store_user_token(db: Session, user: User) -> str:
+    token = issue_token(db, user.id, "user")
+    claims = decode_token(db, token)
+    user.lastTokenIssuedAt = datetime.fromtimestamp(claims["iat"], tz=timezone.utc)
+    db.commit()
+    return token
+
+
+def refresh_and_store_institution_token(db: Session, inst_user: InstitutionUser) -> str:
+    token = issue_token(db, inst_user.id, "institution_user", institution_id=inst_user.institutionId)
+    claims = decode_token(db, token)
+    inst_user.lastTokenIssuedAt = datetime.fromtimestamp(claims["iat"], tz=timezone.utc)
+    db.commit()
+    return token
+
+
+def bootstrap_institution(
+    db: Session,
+    institution_name: str,
+    officer_name: str,
+    officer_email: str,
+    officer_password: str,
+) -> tuple[Institution, InstitutionUser, str]:
+    validate_password_policy(officer_password)
+
+    existing = db.query(InstitutionUser).filter(InstitutionUser.email == officer_email).first()
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    institution = Institution(name=institution_name)
+    db.add(institution)
+    db.flush()
+
+    salt = create_salt()
+    officer = InstitutionUser(
+        institutionId=institution.id,
+        name=officer_name,
+        email=officer_email,
+        role="loan_officer",
+        passwordSalt=salt,
+        passwordHash=hash_password(officer_password, salt),
+    )
+    db.add(officer)
+    db.flush()
+
+    token = refresh_and_store_institution_token(db, officer)
+    db.refresh(institution)
+    db.refresh(officer)
+    return institution, officer, token
+
+
+def ensure_user_property_scope(db: Session, user_id: UUID, property_id: UUID) -> None:
+    row = db.query(UserProperty.id).filter(UserProperty.userId == user_id, UserProperty.propertyId == property_id).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not enrolled on this property")
+
+
+def ensure_institution_not_revoked(db: Session, institution_user_id: UUID) -> None:
+    revoked = db.query(TokenRevocation.id).filter(TokenRevocation.institutionUserId == institution_user_id).first()
+    if revoked is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Institution token revoked")

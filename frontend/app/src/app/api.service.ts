@@ -1,0 +1,217 @@
+import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { map, Observable, tap } from 'rxjs';
+
+import {
+  Acknowledgement,
+  AuthTokenResponse,
+  Institution,
+  InstitutionBootstrapResponse,
+  InstitutionUser,
+  Property,
+  PropertyAgreement,
+  PropertyDetailResponse,
+  PropertyOwnersResponse,
+} from './models';
+
+@Injectable({ providedIn: 'root' })
+export class ApiService {
+  private readonly baseUrl = 'http://127.0.0.1:8000/api/v1';
+  private readonly institutionTokenStorageKey = 'institutionToken';
+  private readonly userTokenStorageKey = 'userToken';
+  private readonly institutionIdStorageKey = 'institutionId';
+  private institutionToken = localStorage.getItem(this.institutionTokenStorageKey) ?? '';
+  private userToken = localStorage.getItem(this.userTokenStorageKey) ?? '';
+  private institutionId = localStorage.getItem(this.institutionIdStorageKey) ?? '';
+
+  constructor(private readonly http: HttpClient) {}
+
+  bootstrapInstitution(payload: {
+    institutionName: string;
+    officerName: string;
+    officerEmail: string;
+    officerPassword: string;
+  }): Observable<InstitutionBootstrapResponse> {
+    return this.http.post<InstitutionBootstrapResponse>(`${this.baseUrl}/auth/institution/bootstrap`, payload).pipe(
+      tap((res) => {
+        this.setInstitutionToken(res.accessToken);
+        this.setInstitutionId(res.institution.id);
+      }),
+    );
+  }
+
+  institutionLogin(email: string, password: string): Observable<AuthTokenResponse> {
+    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/institution/login`, { email, password }).pipe(
+      tap((res) => {
+        this.setInstitutionToken(res.accessToken);
+        this.setInstitutionId(this.extractInstitutionId(res.accessToken));
+      }),
+    );
+  }
+
+  ownerRegister(payload: { name: string; email: string; password: string }): Observable<AuthTokenResponse> {
+    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/register`, payload).pipe(
+      tap((res) => this.setUserToken(res.accessToken)),
+    );
+  }
+
+  ownerLogin(email: string, password: string): Observable<AuthTokenResponse> {
+    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/login`, { email, password }).pipe(
+      tap((res) => this.setUserToken(res.accessToken)),
+    );
+  }
+
+  setInstitutionToken(token: string): void {
+    this.institutionToken = token;
+    if (token) {
+      localStorage.setItem(this.institutionTokenStorageKey, token);
+    } else {
+      localStorage.removeItem(this.institutionTokenStorageKey);
+    }
+  }
+
+  setInstitutionId(institutionId: string): void {
+    this.institutionId = institutionId;
+    if (institutionId) {
+      localStorage.setItem(this.institutionIdStorageKey, institutionId);
+    } else {
+      localStorage.removeItem(this.institutionIdStorageKey);
+    }
+  }
+
+  setUserToken(token: string): void {
+    this.userToken = token;
+    if (token) {
+      localStorage.setItem(this.userTokenStorageKey, token);
+    } else {
+      localStorage.removeItem(this.userTokenStorageKey);
+    }
+  }
+
+  clearTokens(): void {
+    this.setInstitutionToken('');
+    this.setUserToken('');
+  }
+
+  getInstitutionToken(): string {
+    return this.institutionToken;
+  }
+
+  getInstitutionId(): string {
+    return this.institutionId;
+  }
+
+  getUserToken(): string {
+    return this.userToken;
+  }
+
+  createInstitution(name: string): Observable<Institution> {
+    return this.http
+      .post<Institution>(`${this.baseUrl}/institutions`, { name }, { observe: 'response', headers: this.institutionHeaders() })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  createInstitutionUser(payload: { institutionId: string; name: string; email: string; role: string; password: string }): Observable<InstitutionUser> {
+    return this.http
+      .post<InstitutionUser>(`${this.baseUrl}/institution-users`, payload, { observe: 'response', headers: this.institutionHeaders() })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  createProperty(payload: {
+    institutionId: string;
+    address: string;
+    loanAmount: number;
+    currentBalance: number;
+    monthlyPayment: number;
+    dynamicBillingEnabled: boolean;
+  }): Observable<Property> {
+    return this.http
+      .post<Property>(`${this.baseUrl}/properties`, payload, { observe: 'response', headers: this.institutionHeaders() })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  attachAgreement(
+    propertyId: string,
+    payload: { noticeDays: number; valuationMethod: string; partialClaimMethod: string },
+  ): Observable<PropertyAgreement> {
+    return this.http
+      .post<PropertyAgreement>(`${this.baseUrl}/properties/${propertyId}/agreement`, payload, {
+        observe: 'response',
+        headers: this.institutionHeaders(),
+      })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  inviteOwner(
+    propertyId: string,
+    payload: { name: string; email: string; maxOwnershipPercent: number | null },
+  ): Observable<Acknowledgement> {
+    return this.http
+      .post<Acknowledgement>(`${this.baseUrl}/properties/${propertyId}/owners`, payload, {
+        observe: 'response',
+        headers: this.institutionHeaders(),
+      })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  acknowledge(propertyId: string): Observable<Acknowledgement> {
+    return this.http
+      .post<Acknowledgement>(`${this.baseUrl}/properties/${propertyId}/acknowledge`, {}, {
+        observe: 'response',
+        headers: this.userHeaders(),
+      })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'user')));
+  }
+
+  getProperty(propertyId: string): Observable<PropertyDetailResponse> {
+    return this.http
+      .get<PropertyDetailResponse>(`${this.baseUrl}/properties/${propertyId}`, {
+        observe: 'response',
+        headers: this.institutionHeaders(),
+      })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  getOwners(propertyId: string): Observable<PropertyOwnersResponse> {
+    return this.http
+      .get<PropertyOwnersResponse>(`${this.baseUrl}/properties/${propertyId}/owners`, {
+        observe: 'response',
+        headers: this.institutionHeaders(),
+      })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  private institutionHeaders(): HttpHeaders {
+    return new HttpHeaders({ Authorization: `Bearer ${this.institutionToken}` });
+  }
+
+  private userHeaders(): HttpHeaders {
+    return new HttpHeaders({ Authorization: `Bearer ${this.userToken}` });
+  }
+
+  private applyRefreshedToken<T>(response: HttpResponse<T>, tokenType: 'institution' | 'user'): T {
+    const refreshed = response.headers.get('X-Refreshed-Token');
+    if (refreshed) {
+      if (tokenType === 'institution') {
+        this.setInstitutionToken(refreshed);
+      } else {
+        this.setUserToken(refreshed);
+      }
+    }
+    return response.body as T;
+  }
+
+  private extractInstitutionId(token: string): string {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return '';
+    }
+    const payload = JSON.parse(this.base64UrlDecode(parts[1]));
+    return typeof payload.institutionId === 'string' ? payload.institutionId : '';
+  }
+
+  private base64UrlDecode(value: string): string {
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+    return atob(base64);
+  }
+}

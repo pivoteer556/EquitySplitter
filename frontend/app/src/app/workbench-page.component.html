@@ -1,0 +1,99 @@
+<div class="shell">
+  <header class="hero">
+    <p class="eyebrow">Feature 1 Workbench</p>
+    <h1>Property Setup</h1>
+    <p>Run the institution-side workflow with real JWT auth.</p>
+    <button class="ghost" (click)="logout()">Logout</button>
+  </header>
+
+  <section class="status-grid">
+    <div>
+      <span class="label">Institution token</span>
+      <span class="value">{{ institutionToken ? 'present' : 'missing' }}</span>
+    </div>
+    <div>
+      <span class="label">Owner token</span>
+      <span class="value">{{ userToken ? 'present' : 'missing' }}</span>
+    </div>
+    <div>
+      <span class="label">Property status</span>
+      <span class="value">{{ propertyStatus || 'unknown' }}</span>
+    </div>
+    <div>
+      <span class="label">Agreement effective</span>
+      <span class="value">{{ agreementEffectiveAt || 'pending' }}</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Owner Access</h2>
+    <input [(ngModel)]="ownerName" placeholder="Owner name" />
+    <input [(ngModel)]="ownerEmail" placeholder="Owner email" />
+    <input [(ngModel)]="ownerPassword" type="password" placeholder="Owner password" />
+    <button (click)="registerOwner()" [disabled]="!ownerName || !ownerEmail || !ownerPassword">Register Owner</button>
+    <button (click)="loginOwner()" [disabled]="!ownerEmail || !ownerPassword">Login Owner</button>
+    <div class="meta">Owner token is required for acknowledge.</div>
+  </section>
+
+  <section>
+    <h2>Create Property</h2>
+    <input [(ngModel)]="institutionId" placeholder="Institution ID" />
+    <input [(ngModel)]="propertyAddress" placeholder="Address" />
+    <input type="number" [(ngModel)]="loanAmount" placeholder="Loan amount" />
+    <input type="number" [(ngModel)]="currentBalance" placeholder="Current balance" />
+    <input type="number" [(ngModel)]="monthlyPayment" placeholder="Monthly payment" />
+    <label><input type="checkbox" [(ngModel)]="dynamicBillingEnabled" /> Dynamic billing enabled</label>
+    <button (click)="createProperty()" [disabled]="!institutionId">Create Property</button>
+    <div class="meta">propertyId: {{ propertyId || 'not set' }}</div>
+  </section>
+
+  <section>
+    <h2>Agreement</h2>
+    <input type="number" [(ngModel)]="noticeDays" placeholder="Notice days" />
+    <select [(ngModel)]="valuationMethod">
+      <option value="equity_balance">equity_balance</option>
+      <option value="market_based">market_based</option>
+      <option value="negotiated">negotiated</option>
+    </select>
+    <select [(ngModel)]="partialClaimMethod">
+      <option value="pro_rata">pro_rata</option>
+      <option value="first_come_first_served">first_come_first_served</option>
+    </select>
+    <button (click)="attachAgreement()" [disabled]="!propertyId">Attach Agreement</button>
+  </section>
+
+  <section>
+    <h2>Invite Owner</h2>
+    <input [(ngModel)]="ownerName" placeholder="Owner name" />
+    <input [(ngModel)]="ownerEmail" placeholder="Owner email" />
+    <input type="number" [(ngModel)]="maxOwnershipPercent" placeholder="Max ownership percent" />
+    <button (click)="inviteOwner()" [disabled]="!propertyId">Invite Owner</button>
+  </section>
+
+  <section>
+    <h2>Acknowledge</h2>
+    <button (click)="acknowledgeAsOwner()" [disabled]="!propertyId || !userToken">Acknowledge as Owner</button>
+    <div class="meta">Sign in as the owner first, then acknowledge the agreement.</div>
+  </section>
+
+  <section>
+    <h2>Inspect State</h2>
+    <button (click)="refreshProperty()" [disabled]="!propertyId">Get Property</button>
+    <button (click)="refreshOwners()" [disabled]="!propertyId">Get Owners</button>
+    <ul>
+      @for (owner of owners; track owner.userPropertyId) {
+        <li>{{ owner.name }} ({{ owner.email }}) - signedAt: {{ owner.signedAt || 'pending' }}</li>
+      }
+    </ul>
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    @if (error) {
+      <pre class="error">{{ error }}</pre>
+    }
+    @if (lastResponse) {
+      <pre>{{ lastResponse }}</pre>
+    }
+  </section>
+</div>

@@ -1,0 +1,149 @@
+
+<div id="erd"></div>
+<style>
+#erd svg { width: 100%; }
+</style>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    background: dark ? '#1f2937' : '#f8fafc',
+    primaryColor: dark ? '#111827' : '#e2e8f0',
+    primaryBorderColor: dark ? '#94a3b8' : '#334155',
+    primaryTextColor: dark ? '#f8fafc' : '#0f172a',
+    secondaryColor: dark ? '#0f172a' : '#f1f5f9',
+    secondaryTextColor: dark ? '#e5e7eb' : '#1e293b',
+    tertiaryColor: dark ? '#111827' : '#e2e8f0',
+    lineColor: dark ? '#cbd5e1' : '#334155',
+    textColor: dark ? '#f8fafc' : '#0f172a',
+  },
+});
+const { svg } = await mermaid.render('erd-svg', `erDiagram
+  PROPERTY {
+    uuid id PK
+    string address
+    decimal loanAmount
+    decimal currentBalance
+    decimal monthlyPayment
+    bool dynamicBillingEnabled
+  }
+  PROPERTY_AGREEMENT {
+    uuid id PK
+    uuid propertyId FK
+    int noticeDays
+    string valuationMethod
+    string partialClaimMethod
+    timestamp effectiveAt
+  }
+  OWNER_ACKNOWLEDGEMENT {
+    uuid id PK
+    uuid agreementId FK
+    uuid userId FK
+    timestamp signedAt
+  }
+  USER {
+    uuid id PK
+    string name
+    string email
+  }
+  OWNERSHIP {
+    uuid id PK
+    uuid userId FK
+    uuid propertyId FK
+    decimal sharePct
+    decimal equityBalance
+    decimal maxOwnershipPct
+  }
+  PAYMENT_CYCLE {
+    uuid id PK
+    uuid propertyId FK
+    date dueDate
+    decimal equityDue
+    decimal interestDue
+    decimal insuranceDue
+    decimal hoaDue
+    decimal otherDue
+    string status
+  }
+  PAYMENT {
+    uuid id PK
+    uuid cycleId FK
+    uuid ownershipId FK
+    decimal amountDue
+    decimal amountPaid
+    decimal overpayment
+    timestamp paidAt
+  }
+  EQUITY_LEDGER {
+    uuid id PK
+    uuid ownershipId FK
+    uuid cycleId FK
+    decimal baseEquityDelta
+    decimal bonusEquityDelta
+    decimal runningBalance
+    timestamp createdAt
+  }
+  EQUITY_TRANSFER {
+    uuid id PK
+    uuid propertyId FK
+    uuid sellerOwnershipId FK
+    string status
+    decimal askingPrice
+    decimal sharePct
+    timestamp noticeGivenAt
+    timestamp transferredAt
+  }
+  TRANSFER_CLAIM {
+    uuid id PK
+    uuid transferId FK
+    uuid buyerOwnershipId FK
+    decimal claimedPct
+    timestamp claimedAt
+  }
+  PROPERTY ||--|| PROPERTY_AGREEMENT : "governed by"
+  PROPERTY_AGREEMENT ||--o{ OWNER_ACKNOWLEDGEMENT : "signed by"
+  USER ||--o{ OWNER_ACKNOWLEDGEMENT : "signs"
+  USER ||--o{ OWNERSHIP : "holds"
+  PROPERTY ||--o{ OWNERSHIP : "has"
+  PROPERTY ||--o{ PAYMENT_CYCLE : "has"
+  OWNERSHIP ||--o{ PAYMENT : "makes"
+  PAYMENT_CYCLE ||--o{ PAYMENT : "contains"
+  OWNERSHIP ||--o{ EQUITY_LEDGER : "tracks"
+  PAYMENT_CYCLE ||--o{ EQUITY_LEDGER : "generates"
+  PROPERTY ||--o{ EQUITY_TRANSFER : "has"
+  OWNERSHIP ||--o{ EQUITY_TRANSFER : "sold by"
+  EQUITY_TRANSFER ||--o{ TRANSFER_CLAIM : "claimed via"
+  OWNERSHIP ||--o{ TRANSFER_CLAIM : "claimed by"
+`);
+document.getElementById('erd').innerHTML = svg;
+document.querySelectorAll('#erd svg .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
