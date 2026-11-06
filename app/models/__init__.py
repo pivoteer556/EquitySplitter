@@ -9,6 +9,7 @@ from app.models.payment_cycle import PaymentCycle
 from app.models.property import Property
 from app.models.property_agreement import PropertyAgreement
 from app.models.transfer_claim import TransferClaim
+from app.models.rate_limit_hit import RateLimitHit
 from app.models.token_revocation import TokenRevocation
 from app.models.user import User
 from app.models.user_property import UserProperty
@@ -28,4 +29,5 @@ __all__ = [
     "TransferClaim",
     "TokenRevocation",
     "AuthSecretState",
+    "RateLimitHit",
 ]

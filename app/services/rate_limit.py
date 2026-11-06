@@ -1,57 +1,66 @@
-"""In-memory failed-attempt limiter (sliding window), keyed by an arbitrary string.
+"""Database-backed attempt limiter (sliding window), keyed by an arbitrary string.
 
-Seam for callers: retry_after(key) before verifying credentials, record_failure(key) on a bad
-attempt, reset(key) on success. State is per-process only (not shared across replicas).
+Seam for callers: retry_after(db, key) before doing the work, record_attempt(db, key) for each
+counted attempt, reset(db, key) on success. State lives in the `rateLimitHits` table, so it is shared
+by every replica and survives restarts. Known limit: concurrent requests can slip a few attempts past
+the threshold because check and record are separate statements (acceptable for brute-force throttling).
 """
-import threading
-import time
-from collections import deque
+import hashlib
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Callable
+
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from app.models import RateLimitHit
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _as_utc(value: datetime) -> datetime:
+    # SQLite drops tzinfo; values are always stored as UTC.
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 class RateLimiter:
-    def __init__(self, max_failures: int = 5, window_seconds: float = 60.0, clock: Callable[[], float] = time.monotonic):
-        self.max_failures = max_failures
+    def __init__(self, max_attempts: int = 5, window_seconds: int = 60, clock: Callable[[], datetime] = _utcnow):
+        self.max_attempts = max_attempts
         self.window_seconds = window_seconds
         self._clock = clock  # injectable so tests need no sleeping
-        self._failures: dict[str, deque[float]] = {}
-        self._lock = threading.Lock()
 
-    def _prune(self, key: str) -> deque[float]:
-        # Caller must hold the lock. Drops failures older than the window.
-        attempts = self._failures.get(key)
-        if attempts is None:
-            return deque()
-        cutoff = self._clock() - self.window_seconds
-        while attempts and attempts[0] <= cutoff:
-            attempts.popleft()
-        if not attempts:
-            del self._failures[key]
-        return attempts
+    @staticmethod
+    def _digest(key: str) -> str:
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
-    def retry_after(self, key: str) -> int:
+    def retry_after(self, db: Session, key: str) -> int:
         """Seconds until `key` may try again; 0 when not blocked."""
-        with self._lock:
-            attempts = self._prune(key)
-            if len(attempts) < self.max_failures:
-                return 0
-            # Unblocked once the oldest counted failure leaves the window.
-            return max(1, int(attempts[0] + self.window_seconds - self._clock() + 0.999))
+        now = self._clock()
+        expiries = list(
+            db.scalars(
+                select(RateLimitHit.expiresAt)
+                .where(RateLimitHit.key == self._digest(key), RateLimitHit.expiresAt > now)
+                .order_by(RateLimitHit.expiresAt)
+            )
+        )
+        if len(expiries) < self.max_attempts:
+            return 0
+        # Unblocked once enough of the oldest attempts have expired to drop below the threshold.
+        unblock_at = _as_utc(expiries[len(expiries) - self.max_attempts])
+        return max(1, int((unblock_at - now).total_seconds() + 0.999))
 
-    def record_failure(self, key: str) -> None:
-        with self._lock:
-            self._prune(key)
-            self._failures.setdefault(key, deque()).append(self._clock())
+    def record_attempt(self, db: Session, key: str) -> None:
+        now = self._clock()
+        db.execute(delete(RateLimitHit).where(RateLimitHit.expiresAt <= now))  # prune everyone's expired rows
+        db.add(RateLimitHit(id=uuid.uuid4(), key=self._digest(key), expiresAt=now + timedelta(seconds=self.window_seconds)))
+        db.commit()
 
-    def reset(self, key: str) -> None:
-        with self._lock:
-            self._failures.pop(key, None)
-
-    def clear(self) -> None:
-        """Drop all state (test isolation)."""
-        with self._lock:
-            self._failures.clear()
+    def reset(self, db: Session, key: str) -> None:
+        db.execute(delete(RateLimitHit).where(RateLimitHit.key == self._digest(key)))
+        db.commit()
 
 
-# Shared instance used by the login routes.
-login_limiter = RateLimiter()
+# Shared limiters. Both are stateless objects; the counts live in the database.
+login_limiter = RateLimiter(max_attempts=5, window_seconds=60)

@@ -25,12 +25,14 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   secret store. Tokens are also pinned to a server-side `lastTokenIssuedAt`, so only the latest token per account
   is accepted and institution users can be revoked.
 - **Login rate limiting** (`/auth/login`, `/auth/institution/login`): 5 failed attempts per 60 s per email+IP return
-  HTTP 429 with `Retry-After`. It is in-memory per process, so it does not span multiple replicas or survive a
-  restart (move the counters to Redis/DB to scale out). The key uses the socket IP unless `TRUSTED_PROXY_HOPS` is set
-  to the number of reverse proxies in front of the app (Azure Container Apps ingress: `1`), in which case the
-  client IP is the Nth entry from the right of `X-Forwarded-For`. Leave it at `0` when not behind a proxy, otherwise
-  clients could dodge the limit by spoofing the header; set it correctly behind one, otherwise all clients share an
-  IP and one user could lock another out. `/auth/register` and `/auth/institution/bootstrap` are not limited.
+  HTTP 429 with `Retry-After`. Counters live in the database (`rateLimitHits`, keyed by a SHA-256 of the
+  scope+IP+email, so no email/IP is stored), which makes them shared across replicas and durable across restarts.
+  Check-then-record is not atomic, so concurrent requests can slip a few attempts past the threshold.
+  The key uses the socket IP unless `TRUSTED_PROXY_HOPS` is set to the number of reverse proxies in front of the app
+  (Azure Container Apps ingress: `1`), in which case the client IP is the Nth entry from the right of
+  `X-Forwarded-For`. Leave it at `0` when not behind a proxy, otherwise clients could dodge the limit by spoofing the
+  header; set it correctly behind one, otherwise all clients share an IP and one user could lock another out.
+  `/auth/register` and `/auth/institution/bootstrap` are not limited.
 - Known gap: invited owners are created without a password and there is no invite-accept / password-set flow yet.
 
 ## Tests and CI

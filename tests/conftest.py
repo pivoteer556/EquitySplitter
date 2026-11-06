@@ -6,18 +6,12 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
-from app.services.rate_limit import login_limiter
 
 STRONG_PASSWORD = "ValidPass123!"
 
 
 def bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture(autouse=True)
-def _clear_login_limiter():
-    login_limiter.clear()
 
 
 @pytest.fixture()
