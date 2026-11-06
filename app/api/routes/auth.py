@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import Principal, require_institution_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import InstitutionUser, TokenRevocation, User
 from app.schemas.auth import (
@@ -28,9 +29,18 @@ from app.services.rate_limit import login_limiter
 router = APIRouter(prefix="/auth")
 
 
+def _client_ip(request: Request) -> str:
+    peer = request.client.host if request.client else "unknown"
+    hops = settings.trusted_proxy_hops
+    if hops <= 0:
+        return peer  # never trust X-Forwarded-For unless we know how many proxies append to it
+    forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
+    # Each trusted proxy appends the peer it saw, so the real client is the Nth entry from the right.
+    return forwarded[-hops] if len(forwarded) >= hops else peer
+
+
 def _login_key(scope: str, request: Request, email: str) -> str:
-    ip = request.client.host if request.client else "unknown"
-    return f"{scope}:{ip}:{email.strip().lower()}"
+    return f"{scope}:{_client_ip(request)}:{email.strip().lower()}"
 
 
 def _fail_login(key: str, status_code: int, detail: str):

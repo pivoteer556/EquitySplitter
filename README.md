@@ -26,9 +26,11 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   is accepted and institution users can be revoked.
 - **Login rate limiting** (`/auth/login`, `/auth/institution/login`): 5 failed attempts per 60 s per email+IP return
   HTTP 429 with `Retry-After`. It is in-memory per process, so it does not span multiple replicas or survive a
-  restart (move the counters to Redis/DB to scale out). The key uses the direct socket IP; there is no
-  `X-Forwarded-For` handling, so behind a reverse proxy clients effectively share one IP. `/auth/register` and
-  `/auth/institution/bootstrap` are not limited.
+  restart (move the counters to Redis/DB to scale out). The key uses the socket IP unless `TRUSTED_PROXY_HOPS` is set
+  to the number of reverse proxies in front of the app (Azure Container Apps ingress: `1`), in which case the
+  client IP is the Nth entry from the right of `X-Forwarded-For`. Leave it at `0` when not behind a proxy, otherwise
+  clients could dodge the limit by spoofing the header; set it correctly behind one, otherwise all clients share an
+  IP and one user could lock another out. `/auth/register` and `/auth/institution/bootstrap` are not limited.
 - Known gap: invited owners are created without a password and there is no invite-accept / password-set flow yet.
 
 ## Tests and CI

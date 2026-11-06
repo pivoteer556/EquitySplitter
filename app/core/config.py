@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     jwt_secret_seed: str = "replace_me_with_32_plus_characters_seed_value"
     jwt_exp_minutes: int = 10
     jwt_rotation_days: int = 30
+    # Number of reverse proxies in front of the app that append to X-Forwarded-For (0 = trust none).
+    # Azure Container Apps ingress is 1. Only the rightmost N entries are trusted.
+    trusted_proxy_hops: int = 0
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
