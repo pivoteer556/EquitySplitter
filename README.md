@@ -10,6 +10,28 @@ FastAPI + PostgreSQL project scaffolded from the shared mortgage equity ERD.
 - Alembic
 - pytest
 
+[![CI](https://github.com/pivoteer556/EquitySplitter/actions/workflows/ci.yml/badge.svg)](https://github.com/pivoteer556/EquitySplitter/actions/workflows/ci.yml)
+
+Design specs and schema diagrams live in [docs/specs/](docs/specs/).
+
+## Security design notes
+- **Passwords** are hashed with argon2id (`argon2-cffi`, library defaults; the salt is embedded in the
+  encoded hash). Accounts created before this change used salted SHA-256; those hashes still verify and are
+  transparently re-hashed with argon2id on the owner's next successful login, after which `passwordSalt` is cleared.
+- **JWT signing keys** are generated server-side, stored in the `authSecretState` table, and rotated every
+  `JWT_ROTATION_DAYS`. The previous key stays valid for one rotation period so in-flight tokens survive.
+  Keeping keys in the database (not only in env) lets every API instance share and rotate the same key without a
+  redeploy; the trade-off is that a database leak exposes signing keys, so the DB must be treated as a
+  secret store. Tokens are also pinned to a server-side `lastTokenIssuedAt`, so only the latest token per account
+  is accepted and institution users can be revoked.
+- Known gap: invited owners are created without a password and there is no invite-accept / password-set flow yet.
+
+## Tests and CI
+`python -m pytest` runs the equity math, password hashing (including legacy-hash upgrade), and API tests
+(auth, revocation, property/agreement/acknowledgement flow) against in-memory SQLite.
+GitHub Actions (`.github/workflows/ci.yml`) runs the tests on Python 3.12 and 3.14, applies the Alembic
+migrations to a real Postgres, builds the Angular frontend, and builds the Docker image.
+
 ## Run
 1. Create and activate a virtual environment.
 2. Install dependencies:
