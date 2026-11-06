@@ -64,9 +64,10 @@ def _enforce_login_limit(db: Session, key: str) -> None:
     _enforce_limit(login_limiter, db, key, "Too many failed login attempts")
 
 
-def _enforce_signup_limit(db: Session, request: Request) -> None:
+def _enforce_signup_limit(db: Session, request: Request, scope: str = "signup") -> None:
     # Every attempt counts (accepted or rejected): account creation itself is what is being throttled.
-    key = f"signup:{_client_ip(request)}"
+    # `scope` namespaces the key so endpoints (e.g. accept-invite) get their own per-IP budget.
+    key = f"{scope}:{_client_ip(request)}"
     _enforce_limit(signup_limiter, db, key, "Too many signup attempts")
     signup_limiter.record_attempt(db, key)
 
@@ -118,7 +119,8 @@ def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get
 
 
 @router.post("/accept-invite", response_model=AuthTokenResponse)
-def accept_invite_route(payload: AcceptInviteRequest, db: Session = Depends(get_db)):
+def accept_invite_route(payload: AcceptInviteRequest, request: Request, db: Session = Depends(get_db)):
+    _enforce_signup_limit(db, request, scope="accept-invite")
     _, token = accept_invite(db, payload.token, payload.password)
     return AuthTokenResponse(accessToken=token)
 

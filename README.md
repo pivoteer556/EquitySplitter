@@ -34,13 +34,15 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   header; set it correctly behind one, otherwise all clients share an IP and one user could lock another out.
   `/auth/register` and `/auth/institution/bootstrap` share a budget of 10 attempts per hour per IP (accepted or
   rejected, so duplicate-email probing is not free), also returning 429 with `Retry-After`.
+  `/auth/accept-invite` uses the same limit (10 attempts per hour per IP, every attempt counted) but with its own
+  per-IP budget, separate from register/bootstrap. These are per-IP application-level throttles against guessing and
+  abuse, not DDoS protection; volumetric attacks must be absorbed at the edge (e.g. Azure Front Door / WAF).
 - Invited owners start without a password. When the invitee has none, `POST /properties/{id}/owners` returns an
   `inviteToken` (re-inviting issues a fresh one); the loan officer hands it over out-of-band and the invitee POSTs
   `{token, password}` to `/auth/accept-invite` to set a password and get an access token. Tokens expire after 7 days
   and are single-use via the `passwordHash` check; they are stateless, so one can only be invalidated by the user
   setting a password or by key rotation.
-- Known gaps: no email delivery of invites, no password-reset flow for existing users, and `/auth/accept-invite` has
-  no rate limit yet.
+- Known gaps: no email delivery of invites and no password-reset flow for existing users.
 
 ## Tests and CI
 `python -m pytest` runs the equity math, password hashing (including legacy-hash upgrade), and API tests

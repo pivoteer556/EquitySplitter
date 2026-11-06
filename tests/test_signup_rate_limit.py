@@ -60,3 +60,24 @@ def test_signup_limit_does_not_affect_login_counters(client, officer):
         _register(client, i)
     resp = client.post("/api/v1/auth/institution/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD})
     assert resp.status_code == 200
+
+
+def _accept(client, token="garbage", headers=None):
+    return client.post("/api/v1/auth/accept-invite", json={"token": token, "password": STRONG_PASSWORD}, headers=headers)
+
+
+def test_accept_invite_is_limited_per_ip(client):
+    for _ in range(MAX_SIGNUPS):
+        assert _accept(client).status_code == 401
+    blocked = _accept(client)
+    assert blocked.status_code == 429
+    assert int(blocked.headers["Retry-After"]) >= 1
+
+
+def test_accept_invite_and_signup_budgets_are_independent(client):
+    for _ in range(MAX_SIGNUPS):
+        _accept(client)
+    assert _register(client, 0).status_code == 201
+    for i in range(1, MAX_SIGNUPS):
+        _register(client, i)
+    assert _accept(client).status_code == 429
