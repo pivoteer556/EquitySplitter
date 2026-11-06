@@ -2,13 +2,38 @@
 #   - Resource names are "${var.name_prefix}-<role>" (e.g. "${var.name_prefix}-rg").
 #     The ACR name allows alphanumerics only: replace(var.name_prefix, "-", "") + "acr".
 #   - Every resource that supports tags sets `tags = var.tags`.
-#   - No secrets in defaults: secret variables are `sensitive` and have no default.
-#   - No hard-coded IDs (subscription, tenant, ...); take them from variables.
+#   - Secrets are never inputs: they are generated (random_password, alphanumeric only)
+#     and stored in Key Vault. Terraform state therefore contains them; protect the state.
+#   - No hard-coded IDs (subscription, tenant, ...); take them from variables or from the
+#     az CLI login (azuread provider, data.azurerm_client_config).
 #   - Variable names mirror the app's env vars (app/core/config.py, .env.example).
+#
+# Interface contract between files (resource addresses other files may rely on):
+#   identity.tf  random_password.postgres_admin, random_password.jwt_secret_seed
+#                (result = the secret; replaces the removed variables
+#                postgres_admin_password / jwt_secret_seed),
+#                azurerm_key_vault.main (RBAC auth; secrets for both generated values;
+#                applying identity = Key Vault Secrets Officer),
+#                azuread_application.github, azuread_service_principal.github,
+#                azuread_application_federated_identity_credential.github
+#                (subject "repo:${var.github_repository}:ref:refs/heads/master"),
+#                AcrPush on azurerm_container_registry.main,
+#                Contributor on azurerm_container_app.api only.
 
 variable "subscription_id" {
   description = "Azure subscription ID to deploy into."
   type        = string
+}
+
+variable "github_repository" {
+  description = "GitHub repository (owner/name) allowed to deploy via OIDC federation from its master branch."
+  type        = string
+  default     = "pivoteer556/EquitySplitter"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$", var.github_repository))
+    error_message = "github_repository must look like owner/name."
+  }
 }
 
 variable "name_prefix" {
@@ -44,12 +69,6 @@ variable "postgres_admin_login" {
   default     = "pgadmin"
 }
 
-variable "postgres_admin_password" {
-  description = "PostgreSQL administrator password. Also used in the app's DATABASE_URL."
-  type        = string
-  sensitive   = true
-}
-
 variable "postgres_database_name" {
   description = "Name of the application database."
   type        = string
@@ -58,12 +77,6 @@ variable "postgres_database_name" {
 
 # --- Container App ---
 
-variable "image_tag" {
-  description = "Tag of the app image in the ACR repository. Placeholder 'latest' until the first image is pushed."
-  type        = string
-  default     = "latest"
-}
-
 variable "container_port" {
   description = "Port uvicorn listens on in the container (scripts/entrypoint.sh)."
   type        = number
@@ -71,17 +84,6 @@ variable "container_port" {
 }
 
 # --- App settings (env vars read by app/core/config.py) ---
-
-variable "jwt_secret_seed" {
-  description = "JWT_SECRET_SEED. Stored as a Container App secret."
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = length(var.jwt_secret_seed) >= 32
-    error_message = "jwt_secret_seed must be at least 32 characters."
-  }
-}
 
 variable "jwt_exp_minutes" {
   description = "JWT_EXP_MINUTES (app default 10)."

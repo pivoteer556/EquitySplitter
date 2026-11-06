@@ -65,7 +65,7 @@ resource "azurerm_postgresql_flexible_server" "main" {
   sku_name               = "B_Standard_B1ms"
   storage_mb             = 32768
   administrator_login    = var.postgres_admin_login
-  administrator_password = var.postgres_admin_password
+  administrator_password = random_password.postgres_admin.result
   tags                   = var.tags
 
   # Azure assigns an availability zone when none is given; without this, later plans
@@ -93,13 +93,17 @@ resource "azurerm_postgresql_flexible_server_database" "app" {
 
 locals {
   # sslmode=require: Flexible Server enforces TLS. urlencode keeps special characters in
-  # the credentials from breaking the URL. Sensitive because it derives from a sensitive var.
-  database_url = "postgresql+psycopg://${urlencode(var.postgres_admin_login)}:${urlencode(var.postgres_admin_password)}@${azurerm_postgresql_flexible_server.main.fqdn}:5432/${var.postgres_database_name}?sslmode=require"
+  # the credentials from breaking the URL. Sensitive because it derives from a generated
+  # random_password (sensitive).
+  database_url = "postgresql+psycopg://${urlencode(var.postgres_admin_login)}:${urlencode(random_password.postgres_admin.result)}@${azurerm_postgresql_flexible_server.main.fqdn}:5432/${var.postgres_database_name}?sslmode=require"
 }
 
-# NOTE (step 2): the image does not exist in the registry until the first push, so the
-# first `apply` must push the image first (e.g. apply the registry targeted, push, then
-# apply the rest) or use a placeholder image. Not solved in this step (no apply happens).
+# The registry has no image on a first apply, so the app starts from a public placeholder
+# image and the real image is deployed later (separate deploy workflow). ignore_changes on
+# the image keeps `terraform apply` from reverting such a deploy.
+# UNVERIFIED RISK: the placeholder listens on port 80 but ingress targets var.container_port
+# (8000). Creation is expected to succeed, with the revision reporting unhealthy until the
+# real image is deployed; this has not been confirmed by an apply.
 resource "azurerm_container_app" "api" {
   name                         = "${var.name_prefix}-api"
   resource_group_name          = azurerm_resource_group.main.name
@@ -124,7 +128,7 @@ resource "azurerm_container_app" "api" {
 
   secret {
     name  = "jwt-secret-seed"
-    value = var.jwt_secret_seed
+    value = random_password.jwt_secret_seed.result
   }
 
   ingress {
@@ -143,7 +147,7 @@ resource "azurerm_container_app" "api" {
 
     container {
       name   = "api"
-      image  = "${azurerm_container_registry.main.login_server}/equity-splitter-api:${var.image_tag}"
+      image  = "mcr.microsoft.com/k8se/quickstart:latest"
       cpu    = 0.25
       memory = "0.5Gi"
 
@@ -176,4 +180,8 @@ resource "azurerm_container_app" "api" {
 
   # The pull role must exist before the app tries to pull its image.
   depends_on = [azurerm_role_assignment.acr_pull]
+
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
+  }
 }

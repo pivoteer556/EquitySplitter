@@ -19,3 +19,20 @@ output "container_app_name" {
 output "container_app_url" {
   value = "https://${azurerm_container_app.api.ingress[0].fqdn}"
 }
+
+# Non-secret values for the GitHub repo variables used by the deploy workflow.
+output "tenant_id" {
+  value = data.azurerm_client_config.current.tenant_id
+}
+
+output "subscription_id" {
+  value = var.subscription_id
+}
+
+output "github_client_id" {
+  value = azuread_application.github.client_id
+}
+
+output "key_vault_name" {
+  value = azurerm_key_vault.main.name
+}
