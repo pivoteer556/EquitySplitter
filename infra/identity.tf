@@ -67,6 +67,23 @@ resource "azurerm_key_vault_secret" "postgres_admin_password" {
   depends_on = [azurerm_role_assignment.key_vault_applier]
 }
 
+resource "azurerm_key_vault_secret" "database_url" {
+  name         = "database-url"
+  value        = local.database_url
+  key_vault_id = azurerm_key_vault.main.id
+  tags         = var.tags
+
+  depends_on = [azurerm_role_assignment.key_vault_applier]
+}
+
+# The Container App reads its secrets from Key Vault at runtime through its user-assigned
+# identity (Key Vault references), so secret values are not stored in the app definition.
+resource "azurerm_role_assignment" "app_key_vault_reader" {
+  scope                = azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.app.principal_id
+}
+
 resource "azurerm_key_vault_secret" "jwt_secret_seed" {
   name         = "jwt-secret-seed"
   value        = random_password.jwt_secret_seed.result

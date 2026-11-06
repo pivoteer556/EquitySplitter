@@ -121,14 +121,17 @@ resource "azurerm_container_app" "api" {
     identity = azurerm_user_assigned_identity.app.id
   }
 
+  # Key Vault references (versionless: picks up new secret versions on revision restart).
   secret {
-    name  = "database-url"
-    value = local.database_url
+    name                = "database-url"
+    key_vault_secret_id = azurerm_key_vault_secret.database_url.versionless_id
+    identity            = azurerm_user_assigned_identity.app.id
   }
 
   secret {
-    name  = "jwt-secret-seed"
-    value = random_password.jwt_secret_seed.result
+    name                = "jwt-secret-seed"
+    key_vault_secret_id = azurerm_key_vault_secret.jwt_secret_seed.versionless_id
+    identity            = azurerm_user_assigned_identity.app.id
   }
 
   ingress {
@@ -179,7 +182,8 @@ resource "azurerm_container_app" "api" {
   }
 
   # The pull role must exist before the app tries to pull its image.
-  depends_on = [azurerm_role_assignment.acr_pull]
+  # The pull and Key Vault read roles must exist before the app pulls its image / secrets.
+  depends_on = [azurerm_role_assignment.acr_pull, azurerm_role_assignment.app_key_vault_reader]
 
   lifecycle {
     ignore_changes = [template[0].container[0].image]
