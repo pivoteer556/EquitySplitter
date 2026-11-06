@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -154,7 +154,7 @@ def institution_revoke(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Institution user not found")
 
     revocation = TokenRevocation(institutionUserId=target.id, revokedBy=None)
-    target.lastTokenIssuedAt = datetime.now(timezone.utc).replace(microsecond=0)
+    target.lastTokenIssuedAt = datetime.now(UTC).replace(microsecond=0)
     db.add(revocation)
     db.commit()
     return None

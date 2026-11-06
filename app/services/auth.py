@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import re
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import jwt
@@ -21,7 +21,7 @@ INVITE_TOKEN_DAYS = 7
 
 
 def now_utc_seconds() -> datetime:
-    return datetime.now(timezone.utc).replace(microsecond=0)
+    return datetime.now(UTC).replace(microsecond=0)
 
 
 def _derive_secret(seed: str) -> str:
@@ -58,7 +58,7 @@ def hash_password(password: str) -> str:
 
 
 def _verify_legacy_sha256(password: str, salt: str, password_hash: str) -> bool:
-    candidate = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+    candidate = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
     return hmac.compare_digest(candidate, password_hash)
 
 
@@ -134,7 +134,7 @@ def validate_active_token_iat(stored: datetime | None, token_iat: int | None) ->
     if stored is None or token_iat is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token session")
     if stored.tzinfo is None:  # SQLite drops tzinfo; values are always stored as UTC
-        stored = stored.replace(tzinfo=timezone.utc)
+        stored = stored.replace(tzinfo=UTC)
     if int(stored.timestamp()) != token_iat:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token no longer active")
 
@@ -142,7 +142,7 @@ def validate_active_token_iat(stored: datetime | None, token_iat: int | None) ->
 def refresh_and_store_user_token(db: Session, user: User) -> str:
     token = issue_token(db, user.id, "user")
     claims = decode_token(db, token)
-    user.lastTokenIssuedAt = datetime.fromtimestamp(claims["iat"], tz=timezone.utc)
+    user.lastTokenIssuedAt = datetime.fromtimestamp(claims["iat"], tz=UTC)
     db.commit()
     return token
 
@@ -166,7 +166,7 @@ def accept_invite(db: Session, token: str, password: str) -> tuple[User, str]:
 def refresh_and_store_institution_token(db: Session, inst_user: InstitutionUser) -> str:
     token = issue_token(db, inst_user.id, "institution_user", institution_id=inst_user.institutionId)
     claims = decode_token(db, token)
-    inst_user.lastTokenIssuedAt = datetime.fromtimestamp(claims["iat"], tz=timezone.utc)
+    inst_user.lastTokenIssuedAt = datetime.fromtimestamp(claims["iat"], tz=UTC)
     db.commit()
     return token
 

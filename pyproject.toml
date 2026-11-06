@@ -1,0 +1,13 @@
+[tool.ruff]
+# 200: the longest existing line is ~218 (long string/SQL literals); lint without reformatting code.
+line-length = 200
+# CI runs 3.12 and 3.14; the Docker image/runtime floor is 3.12.
+target-version = "py312"
+extend-exclude = ["frontend", "node_modules", ".venv", "venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI idiom: Depends() in a default argument is intentional (B008). Whitelist the call, not the rule.
+extend-immutable-calls = ["fastapi.Depends"]

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 
@@ -78,7 +78,7 @@ def test_invite_token_is_single_use(client, officer):
 def test_expired_invite_token_is_rejected(client, officer, session_factory):
     _invited(client, officer)
     uid = _user_id(session_factory)
-    past = datetime.now(timezone.utc) - timedelta(days=1)
+    past = datetime.now(UTC) - timedelta(days=1)
     expired = _signed(session_factory, {"sub": str(uid), "userType": "invite", "iat": int((past - timedelta(days=7)).timestamp()), "exp": int(past.timestamp())})
     assert _accept(client, expired).status_code == 401
 

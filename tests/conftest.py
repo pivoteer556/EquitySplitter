@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,7 +24,7 @@ def clock(monkeypatch):
     boundary between them. Starts 60 s in the past: PyJWT rejects a token whose iat is in the real future, and
     its exp must stay valid, so tests may advance this clock by up to ~60 s but no further.
     """
-    state = {"now": datetime.now(timezone.utc).replace(microsecond=0) - timedelta(seconds=60)}
+    state = {"now": datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=60)}
     monkeypatch.setattr("app.services.auth.now_utc_seconds", lambda: state["now"])
     return state
 

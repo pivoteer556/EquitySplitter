@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -8,7 +8,7 @@ from app.api.deps.auth import Principal, require_institution_user, require_user,
 from app.db.session import get_db
 from app.models import Institution, InstitutionUser, OwnerAcknowledgement, Property, PropertyAgreement, User, UserProperty
 from app.schemas.institution import InstitutionCreate, InstitutionRead, InstitutionUserCreate, InstitutionUserRead
-from app.schemas.owner_acknowledgement import AcknowledgementRead, OwnerInviteRead, PropertyDetailRead, PropertyOwnerStatus, PropertyOwnersRead
+from app.schemas.owner_acknowledgement import AcknowledgementRead, OwnerInviteRead, PropertyDetailRead, PropertyOwnersRead, PropertyOwnerStatus
 from app.schemas.property import PropertyCreate, PropertyRead
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
@@ -176,13 +176,13 @@ def acknowledge_agreement(
     if ack is None:
         raise HTTPException(status_code=404, detail="Acknowledgement record not found")
 
-    ack.signedAt = datetime.now(timezone.utc)
+    ack.signedAt = datetime.now(UTC)
 
     all_acks = db.query(OwnerAcknowledgement).filter(OwnerAcknowledgement.agreementId == agreement.id).all()
     if all(a.signedAt is not None for a in all_acks):
         prop.status = "active"
         if agreement.effectiveAt is None:
-            agreement.effectiveAt = datetime.now(timezone.utc)
+            agreement.effectiveAt = datetime.now(UTC)
 
     db.commit()
     db.refresh(ack)
@@ -202,7 +202,10 @@ def get_property(
     require_user_property_scope(prop.id, principal, db)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
-    return {"property": PropertyRead.model_validate(prop).model_dump(), "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else PropertyAgreementRead.model_validate({}).model_dump()}
+    return {
+        "property": PropertyRead.model_validate(prop).model_dump(),
+        "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else PropertyAgreementRead.model_validate({}).model_dump(),
+    }
 
 
 @router.get("/properties/{propertyId}/owners", response_model=PropertyOwnersRead)

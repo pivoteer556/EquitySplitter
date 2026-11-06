@@ -21,8 +21,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
+      # Lint once (not per matrix leg); ruff config lives in pyproject.toml.
+      - run: ruff check .
+        if: matrix.python-version == '3.12'
 
   migrations:
     runs-on: ubuntu-latest
