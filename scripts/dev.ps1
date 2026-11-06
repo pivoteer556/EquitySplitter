@@ -44,7 +44,7 @@ import secrets
 
 from app.db.session import SessionLocal
 from app.models import Institution, InstitutionUser
-from app.services.auth import create_salt, hash_password
+from app.services.auth import hash_password
 
 USERNAME = "wilkenia"
 PASSWORD = secrets.token_urlsafe(24)
@@ -60,8 +60,7 @@ try:
         db.flush()
 
     user = db.query(InstitutionUser).filter(InstitutionUser.email == EMAIL).first()
-    salt = create_salt()
-    password_hash = hash_password(PASSWORD, salt)
+    password_hash = hash_password(PASSWORD)
 
     if user is None:
         user = InstitutionUser(
@@ -69,7 +68,6 @@ try:
             name=USERNAME,
             email=EMAIL,
             role="loan_officer",
-            passwordSalt=salt,
             passwordHash=password_hash,
         )
         db.add(user)
@@ -77,7 +75,7 @@ try:
         user.name = USERNAME
         user.role = "loan_officer"
         user.institutionId = institution.id
-        user.passwordSalt = salt
+        user.passwordSalt = None
         user.passwordHash = password_hash
 
     db.commit()

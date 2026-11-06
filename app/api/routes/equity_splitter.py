@@ -12,7 +12,7 @@ from app.schemas.owner_acknowledgement import AcknowledgementRead, PropertyDetai
 from app.schemas.property import PropertyCreate, PropertyRead
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
-from app.services.auth import create_salt, hash_password, validate_password_policy
+from app.services.auth import hash_password, validate_password_policy
 
 router = APIRouter()
 
@@ -45,8 +45,7 @@ def create_institution_user(
     validate_password_policy(payload.password)
     raw = payload.model_dump()
     password = raw.pop("password")
-    salt = create_salt()
-    inst_user = InstitutionUser(**raw, passwordSalt=salt, passwordHash=hash_password(password, salt))
+    inst_user = InstitutionUser(**raw, passwordHash=hash_password(password))
     db.add(inst_user)
     db.commit()
     db.refresh(inst_user)

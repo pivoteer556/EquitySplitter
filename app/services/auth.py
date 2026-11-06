@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import jwt
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -46,17 +48,21 @@ def maybe_rotate_secrets(db: Session) -> None:
     db.commit()
 
 
-def hash_password(password: str, salt: str) -> str:
-    return hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+_hasher = PasswordHasher()  # argon2id with library defaults; salt is generated and embedded in the hash
+
+
+def hash_password(password: str) -> str:
+    return _hasher.hash(password)
+
+
+def _verify_legacy_sha256(password: str, salt: str, password_hash: str) -> bool:
+    candidate = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+    return hmac.compare_digest(candidate, password_hash)
 
 
 def validate_password_policy(password: str) -> None:
     if not PASSWORD_POLICY.match(password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password does not meet policy requirements")
-
-
-def create_salt() -> str:
-    return secrets.token_hex(16)
 
 
 def issue_token(db: Session, subject_id: UUID, user_type: str, institution_id: UUID | None = None) -> str:
@@ -86,9 +92,26 @@ def decode_token(db: Session, token: str) -> dict:
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
 
-def verify_password(password: str, salt: str, password_hash: str) -> bool:
-    candidate = hash_password(password, salt)
-    return hmac.compare_digest(candidate, password_hash)
+def verify_and_upgrade_password(db: Session, account: User | InstitutionUser, password: str) -> bool:
+    """Check a password against an account, transparently upgrading legacy salted-SHA-256 hashes to argon2id."""
+    stored = account.passwordHash
+    if stored is None:
+        return False
+    if stored.startswith("$argon2"):
+        try:
+            _hasher.verify(stored, password)
+        except (VerificationError, InvalidHashError):
+            return False
+        if _hasher.check_needs_rehash(stored):
+            account.passwordHash = hash_password(password)
+            db.commit()
+        return True
+    if account.passwordSalt is None or not _verify_legacy_sha256(password, account.passwordSalt, stored):
+        return False
+    account.passwordHash = hash_password(password)
+    account.passwordSalt = None
+    db.commit()
+    return True
 
 
 def validate_active_token_iat(stored: datetime | None, token_iat: int | None) -> None:
@@ -131,14 +154,12 @@ def bootstrap_institution(
     db.add(institution)
     db.flush()
 
-    salt = create_salt()
     officer = InstitutionUser(
         institutionId=institution.id,
         name=officer_name,
         email=officer_email,
         role="loan_officer",
-        passwordSalt=salt,
-        passwordHash=hash_password(officer_password, salt),
+        passwordHash=hash_password(officer_password),
     )
     db.add(officer)
     db.flush()

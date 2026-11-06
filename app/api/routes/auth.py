@@ -16,13 +16,12 @@ from app.schemas.auth import (
     InstitutionRevokeRequest,
 )
 from app.services.auth import (
-    create_salt,
     bootstrap_institution,
     hash_password,
     refresh_and_store_institution_token,
     refresh_and_store_user_token,
     validate_password_policy,
-    verify_password,
+    verify_and_upgrade_password,
 )
 
 router = APIRouter(prefix="/auth")
@@ -51,8 +50,7 @@ def register(payload: AuthRegisterRequest, db: Session = Depends(get_db)):
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    salt = create_salt()
-    user = User(name=payload.name, email=payload.email, passwordSalt=salt, passwordHash=hash_password(payload.password, salt))
+    user = User(name=payload.name, email=payload.email, passwordHash=hash_password(payload.password))
     db.add(user)
     db.flush()
     token = refresh_and_store_user_token(db, user)
@@ -62,9 +60,9 @@ def register(payload: AuthRegisterRequest, db: Session = Depends(get_db)):
 @router.post("/login", response_model=AuthTokenResponse)
 def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
-    if user is None or user.passwordHash is None or user.passwordSalt is None:
+    if user is None or user.passwordHash is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
-    if not verify_password(payload.password, user.passwordSalt, user.passwordHash):
+    if not verify_and_upgrade_password(db, user, payload.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = refresh_and_store_user_token(db, user)
     return AuthTokenResponse(accessToken=token)
@@ -73,9 +71,9 @@ def login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
 @router.post("/institution/login", response_model=AuthTokenResponse)
 def institution_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
     inst_user = db.query(InstitutionUser).filter(InstitutionUser.email == payload.email).first()
-    if inst_user is None or inst_user.passwordHash is None or inst_user.passwordSalt is None:
+    if inst_user is None or inst_user.passwordHash is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
-    if not verify_password(payload.password, inst_user.passwordSalt, inst_user.passwordHash):
+    if not verify_and_upgrade_password(db, inst_user, payload.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = refresh_and_store_institution_token(db, inst_user)
     return AuthTokenResponse(accessToken=token)
