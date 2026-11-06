@@ -8,11 +8,11 @@ from app.api.deps.auth import Principal, require_institution_user, require_user,
 from app.db.session import get_db
 from app.models import Institution, InstitutionUser, OwnerAcknowledgement, Property, PropertyAgreement, User, UserProperty
 from app.schemas.institution import InstitutionCreate, InstitutionRead, InstitutionUserCreate, InstitutionUserRead
-from app.schemas.owner_acknowledgement import AcknowledgementRead, PropertyDetailRead, PropertyOwnerStatus, PropertyOwnersRead
+from app.schemas.owner_acknowledgement import AcknowledgementRead, OwnerInviteRead, PropertyDetailRead, PropertyOwnerStatus, PropertyOwnersRead
 from app.schemas.property import PropertyCreate, PropertyRead
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
-from app.services.auth import hash_password, validate_password_policy
+from app.services.auth import hash_password, issue_invite_token, validate_password_policy
 
 router = APIRouter()
 
@@ -96,7 +96,15 @@ def attach_agreement(
     return agreement
 
 
-@router.post("/properties/{propertyId}/owners", response_model=AcknowledgementRead, status_code=status.HTTP_201_CREATED)
+def _with_invite_token(db: Session, user: User, ack: OwnerAcknowledgement) -> OwnerInviteRead:
+    # Only passwordless invitees need a token to set their password; re-invites re-issue a fresh one.
+    result = OwnerInviteRead.model_validate(ack)
+    if user.passwordHash is None:
+        result.inviteToken = issue_invite_token(db, user.id)
+    return result
+
+
+@router.post("/properties/{propertyId}/owners", response_model=OwnerInviteRead, status_code=status.HTTP_201_CREATED)
 def invite_owner(
     propertyId: str,
     payload: OwnerInviteCreate,
@@ -133,13 +141,13 @@ def invite_owner(
         OwnerAcknowledgement.userPropertyId == user_property.id,
     ).first()
     if existing_ack is not None:
-        return existing_ack
+        return _with_invite_token(db, user, existing_ack)
 
     ack = OwnerAcknowledgement(agreementId=agreement.id, userPropertyId=user_property.id, signedAt=None)
     db.add(ack)
     db.commit()
     db.refresh(ack)
-    return ack
+    return _with_invite_token(db, user, ack)
 
 
 @router.post("/properties/{propertyId}/acknowledge", response_model=AcknowledgementRead)

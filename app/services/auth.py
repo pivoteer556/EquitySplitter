@@ -17,6 +17,8 @@ from app.models import AuthSecretState, Institution, InstitutionUser, TokenRevoc
 
 PASSWORD_POLICY = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$")
 
+INVITE_TOKEN_DAYS = 7
+
 
 def now_utc_seconds() -> datetime:
     return datetime.now(timezone.utc).replace(microsecond=0)
@@ -79,6 +81,20 @@ def issue_token(db: Session, subject_id: UUID, user_type: str, institution_id: U
     return jwt.encode(claims, state.currentSecret, algorithm="HS256")
 
 
+def issue_invite_token(db: Session, user_id: UUID) -> str:
+    """Signed, stateless invite token (no DB row, no lastTokenIssuedAt). userType="invite" keeps it out of every
+    auth dependency, which only accept "user"/"institution_user". Single-use is enforced by accept_invite
+    (passwordHash must still be unset)."""
+    iat_dt = now_utc_seconds()
+    claims = {
+        "sub": str(user_id),
+        "userType": "invite",
+        "iat": int(iat_dt.timestamp()),
+        "exp": int((iat_dt + timedelta(days=INVITE_TOKEN_DAYS)).timestamp()),
+    }
+    return jwt.encode(claims, ensure_secret_state(db).currentSecret, algorithm="HS256")
+
+
 def decode_token(db: Session, token: str) -> dict:
     state = ensure_secret_state(db)
     secrets_to_try = [state.currentSecret]
@@ -129,6 +145,22 @@ def refresh_and_store_user_token(db: Session, user: User) -> str:
     user.lastTokenIssuedAt = datetime.fromtimestamp(claims["iat"], tz=timezone.utc)
     db.commit()
     return token
+
+
+def accept_invite(db: Session, token: str, password: str) -> tuple[User, str]:
+    """Set the password of an invited owner and log them in. Token is validated before the password policy."""
+    claims = decode_token(db, token)  # decode_token can't tell token types apart; check below
+    if claims.get("userType") != "invite":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    try:
+        user = db.get(User, UUID(claims["sub"]))
+    except (KeyError, ValueError):
+        user = None
+    if user is None or user.passwordHash is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired invite")
+    validate_password_policy(password)
+    user.passwordHash = hash_password(password)
+    return user, refresh_and_store_user_token(db, user)  # commits the hash and the session iat together
 
 
 def refresh_and_store_institution_token(db: Session, inst_user: InstitutionUser) -> str:

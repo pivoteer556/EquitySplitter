@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models import InstitutionUser, TokenRevocation, User
 from app.schemas.auth import (
+    AcceptInviteRequest,
     AuthLoginRequest,
     AuthRegisterRequest,
     AuthTokenResponse,
@@ -17,6 +18,7 @@ from app.schemas.auth import (
     InstitutionRevokeRequest,
 )
 from app.services.auth import (
+    accept_invite,
     bootstrap_institution,
     hash_password,
     refresh_and_store_institution_token,
@@ -112,6 +114,12 @@ def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get
         _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     login_limiter.reset(db, key)
     token = refresh_and_store_user_token(db, user)
+    return AuthTokenResponse(accessToken=token)
+
+
+@router.post("/accept-invite", response_model=AuthTokenResponse)
+def accept_invite_route(payload: AcceptInviteRequest, db: Session = Depends(get_db)):
+    _, token = accept_invite(db, payload.token, payload.password)
     return AuthTokenResponse(accessToken=token)
 
 

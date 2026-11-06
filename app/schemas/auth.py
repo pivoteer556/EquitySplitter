@@ -39,6 +39,11 @@ class AuthTokenResponse(BaseModel):
     tokenType: str = "Bearer"
 
 
+class AcceptInviteRequest(BaseModel):
+    token: str
+    password: str
+
+
 class InstitutionRevokeRequest(BaseModel):
     institutionUserId: str | None = None
 

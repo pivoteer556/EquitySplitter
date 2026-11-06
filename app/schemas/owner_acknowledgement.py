@@ -13,6 +13,11 @@ class AcknowledgementRead(BaseModel):
     signedAt: datetime | None
 
 
+class OwnerInviteRead(AcknowledgementRead):
+    # Subclass so the acknowledge endpoint's response shape is unchanged.
+    inviteToken: str | None = None
+
+
 class PropertyOwnerStatus(BaseModel):
     userPropertyId: UUID
     userId: UUID

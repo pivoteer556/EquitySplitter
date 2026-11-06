@@ -62,10 +62,7 @@ def test_invite_owner_requires_agreement(client, officer):
     assert resp.status_code == 400
 
 
-def test_property_activates_when_all_owners_acknowledge(client, officer, session_factory):
-    from app.models import User
-    from app.services.auth import hash_password
-
+def test_property_activates_when_all_owners_acknowledge(client, officer):
     prop = _property(client, officer)
     assert _agreement(client, officer, prop["id"]).status_code == 201
     invite = client.post(
@@ -82,11 +79,9 @@ def test_property_activates_when_all_owners_acknowledge(client, officer, session
     )
     assert again.json()["id"] == invite.json()["id"]
 
-    # Invited owners have no password (there is no invite-accept flow yet); set one directly.
-    db = session_factory()
-    db.query(User).filter(User.email == "owner@example.com").one().passwordHash = hash_password(STRONG_PASSWORD)
-    db.commit()
-    db.close()
+    # The invited owner has no password; they set one with the invite token the officer hands over.
+    accepted = client.post(f"{API}/auth/accept-invite", json={"token": invite.json()["inviteToken"], "password": STRONG_PASSWORD})
+    assert accepted.status_code == 200, accepted.text
 
     token = client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": STRONG_PASSWORD}).json()["accessToken"]
     ack = client.post(f"{API}/properties/{prop['id']}/acknowledge", headers=bearer(token))
