@@ -117,6 +117,8 @@ def verify_and_upgrade_password(db: Session, account: User | InstitutionUser, pa
 def validate_active_token_iat(stored: datetime | None, token_iat: int | None) -> None:
     if stored is None or token_iat is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token session")
+    if stored.tzinfo is None:  # SQLite drops tzinfo; values are always stored as UTC
+        stored = stored.replace(tzinfo=timezone.utc)
     if int(stored.timestamp()) != token_iat:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token no longer active")
 
