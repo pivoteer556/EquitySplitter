@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -12,6 +14,19 @@ STRONG_PASSWORD = "ValidPass123!"
 
 def bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(autouse=True)
+def clock(monkeypatch):
+    """Freeze token timestamps (JWT iat is stored server-side and rotates every request).
+
+    Without this, a test that reuses a token across calls fails whenever the wall clock crosses a second
+    boundary between them. Starts 60 s in the past: PyJWT rejects a token whose iat is in the real future, and
+    its exp must stay valid, so tests may advance this clock by up to ~60 s but no further.
+    """
+    state = {"now": datetime.now(timezone.utc).replace(microsecond=0) - timedelta(seconds=60)}
+    monkeypatch.setattr("app.services.auth.now_utc_seconds", lambda: state["now"])
+    return state
 
 
 @pytest.fixture()

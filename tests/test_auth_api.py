@@ -72,6 +72,18 @@ def test_authenticated_call_returns_refreshed_token(client, officer):
     assert "X-Refreshed-Token" in resp.headers
 
 
+def test_token_is_superseded_by_the_refreshed_one(client, officer, clock):
+    from datetime import timedelta
+
+    old = officer["accessToken"]
+    clock["now"] += timedelta(seconds=1)
+    first = client.post("/api/v1/institutions", json={"name": "A"}, headers=bearer(old))
+    assert first.status_code == 201
+    # The first call rotated the stored iat, so the original token no longer matches.
+    assert client.post("/api/v1/institutions", json={"name": "B"}, headers=bearer(old)).status_code == 401
+    assert client.post("/api/v1/institutions", json={"name": "B"}, headers=bearer(first.headers["X-Refreshed-Token"])).status_code == 201
+
+
 def test_revoked_institution_user_is_locked_out(client, officer):
     token = officer["accessToken"]
     assert client.post("/api/v1/auth/institution/revoke", json={}, headers=bearer(token)).status_code == 204
