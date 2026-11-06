@@ -24,7 +24,7 @@ from app.services.auth import (
     validate_password_policy,
     verify_and_upgrade_password,
 )
-from app.services.rate_limit import login_limiter
+from app.services.rate_limit import RateLimiter, login_limiter, signup_limiter
 
 router = APIRouter(prefix="/auth")
 
@@ -48,18 +48,30 @@ def _fail_login(db: Session, key: str, status_code: int, detail: str):
     raise HTTPException(status_code=status_code, detail=detail)
 
 
-def _enforce_login_limit(db: Session, key: str) -> None:
-    wait = login_limiter.retry_after(db, key)
+def _enforce_limit(limiter: RateLimiter, db: Session, key: str, detail: str) -> None:
+    wait = limiter.retry_after(db, key)
     if wait > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed login attempts",
+            detail=detail,
             headers={"Retry-After": str(wait)},
         )
 
 
+def _enforce_login_limit(db: Session, key: str) -> None:
+    _enforce_limit(login_limiter, db, key, "Too many failed login attempts")
+
+
+def _enforce_signup_limit(db: Session, request: Request) -> None:
+    # Every attempt counts (accepted or rejected): account creation itself is what is being throttled.
+    key = f"signup:{_client_ip(request)}"
+    _enforce_limit(signup_limiter, db, key, "Too many signup attempts")
+    signup_limiter.record_attempt(db, key)
+
+
 @router.post("/institution/bootstrap", response_model=InstitutionBootstrapResponse, status_code=status.HTTP_201_CREATED)
-def institution_bootstrap(payload: InstitutionBootstrapRequest, db: Session = Depends(get_db)):
+def institution_bootstrap(payload: InstitutionBootstrapRequest, request: Request, db: Session = Depends(get_db)):
+    _enforce_signup_limit(db, request)
     institution, officer, token = bootstrap_institution(
         db,
         payload.institutionName,
@@ -75,7 +87,8 @@ def institution_bootstrap(payload: InstitutionBootstrapRequest, db: Session = De
 
 
 @router.post("/register", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: AuthRegisterRequest, db: Session = Depends(get_db)):
+def register(payload: AuthRegisterRequest, request: Request, db: Session = Depends(get_db)):
+    _enforce_signup_limit(db, request)
     validate_password_policy(payload.password)
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing is not None:

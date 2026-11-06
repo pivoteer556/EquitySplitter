@@ -62,5 +62,6 @@ class RateLimiter:
         db.commit()
 
 
-# Shared limiters. Both are stateless objects; the counts live in the database.
-login_limiter = RateLimiter(max_attempts=5, window_seconds=60)
+# Shared limiters. Stateless objects; the counts live in the database.
+login_limiter = RateLimiter(max_attempts=5, window_seconds=60)  # failed logins per scope+IP+email
+signup_limiter = RateLimiter(max_attempts=10, window_seconds=3600)  # every signup attempt per IP

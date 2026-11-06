@@ -24,7 +24,7 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   redeploy; the trade-off is that a database leak exposes signing keys, so the DB must be treated as a
   secret store. Tokens are also pinned to a server-side `lastTokenIssuedAt`, so only the latest token per account
   is accepted and institution users can be revoked.
-- **Login rate limiting** (`/auth/login`, `/auth/institution/login`): 5 failed attempts per 60 s per email+IP return
+- **Rate limiting** — logins (`/auth/login`, `/auth/institution/login`): 5 failed attempts per 60 s per email+IP return
   HTTP 429 with `Retry-After`. Counters live in the database (`rateLimitHits`, keyed by a SHA-256 of the
   scope+IP+email, so no email/IP is stored), which makes them shared across replicas and durable across restarts.
   Check-then-record is not atomic, so concurrent requests can slip a few attempts past the threshold.
@@ -32,7 +32,8 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   (Azure Container Apps ingress: `1`), in which case the client IP is the Nth entry from the right of
   `X-Forwarded-For`. Leave it at `0` when not behind a proxy, otherwise clients could dodge the limit by spoofing the
   header; set it correctly behind one, otherwise all clients share an IP and one user could lock another out.
-  `/auth/register` and `/auth/institution/bootstrap` are not limited.
+  `/auth/register` and `/auth/institution/bootstrap` share a budget of 10 attempts per hour per IP (accepted or
+  rejected, so duplicate-email probing is not free), also returning 429 with `Retry-After`.
 - Known gap: invited owners are created without a password and there is no invite-accept / password-set flow yet.
 
 ## Tests and CI
