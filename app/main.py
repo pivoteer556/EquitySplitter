@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -12,19 +14,6 @@ from app.db.session import SessionLocal
 from app.services.auth import ensure_secret_state, maybe_rotate_secrets
 
 logger = logging.getLogger("equitysplitter.startup")
-
-app = FastAPI(title=settings.app_name)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:4200",
-        "http://127.0.0.1:4200",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.include_router(api_router)
 
 UI_PATH = Path(__file__).parent / "ui" / "index.html"
 
@@ -42,8 +31,8 @@ async def _rotation_loop() -> None:
         await asyncio.sleep(3600)
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global rotation_task
     db = SessionLocal()
     try:
@@ -52,14 +41,26 @@ async def startup() -> None:
     finally:
         db.close()
     rotation_task = asyncio.create_task(_rotation_loop())
+    try:
+        yield
+    finally:
+        if rotation_task is not None:
+            rotation_task.cancel()
+            rotation_task = None
 
 
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    global rotation_task
-    if rotation_task is not None:
-        rotation_task.cancel()
-        rotation_task = None
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:4200",
+        "http://127.0.0.1:4200",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(api_router)
 
 
 @app.get("/health")

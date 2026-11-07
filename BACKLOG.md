@@ -44,10 +44,10 @@ talk to the API without script.
 
 ## 6. Smaller items
 
-- Migrate `@app.on_event` to a lifespan handler; resolve the `httpx` vs `httpx2` Starlette deprecation warning.
+- Resolve the `httpx` vs `httpx2` Starlette deprecation warning.
 - Bump Node 20 actions (`actions/checkout@v4`, `setup-python@v5`, `azure/login@v2`) if newer majors exist.
 - Dependabot and/or a scheduled pip-audit job (CI only audits at push time).
-- alembic `env.py` `%` escaping bug; Key Vault purge protection and network ACLs.
+- Key Vault purge protection and network ACLs.
 - Public Postgres plus the Azure-services firewall rule; README note on the cross-region database.
 - Clean up the ghost `equitysplitter-pg` servers in eastus2.
 - Audit log, password reset, atomic rate limiter; accessibility checks; GitHub repo description/topics.
@@ -72,3 +72,5 @@ talk to the API without script.
 - Intermittent CI failure: SQLite NUMERIC affinity on `postgresql.UUID` in tests (fixed with a `CHAR(32)` hook).
 - Login page shows plain-language errors (`friendlyError`).
 - `.gitattributes` forces LF for shell scripts (`*.sh text eol=lf`). Requirements-file CRLF warnings remain harmless.
+- `@app.on_event` replaced by a lifespan handler (no deprecation warning; startup verified against Postgres).
+- alembic `env.py` handles `%` in `DATABASE_URL`.
