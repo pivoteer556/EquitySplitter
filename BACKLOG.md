@@ -46,7 +46,6 @@ talk to the API without script.
 
 - Migrate `@app.on_event` to a lifespan handler; resolve the `httpx` vs `httpx2` Starlette deprecation warning.
 - Bump Node 20 actions (`actions/checkout@v4`, `setup-python@v5`, `azure/login@v2`) if newer majors exist.
-- `.gitattributes` (`*.sh text eol=lf`, LF for requirements files) to stop CRLF warnings.
 - Dependabot and/or a scheduled pip-audit job (CI only audits at push time).
 - alembic `env.py` `%` escaping bug; Key Vault purge protection and network ACLs.
 - Public Postgres plus the Azure-services firewall rule; README note on the cross-region database.
@@ -72,3 +71,4 @@ talk to the API without script.
 - Dependency CVEs: fastapi/starlette, PyJWT, pytest/httpx moved to dev, pip-audit CI gate.
 - Intermittent CI failure: SQLite NUMERIC affinity on `postgresql.UUID` in tests (fixed with a `CHAR(32)` hook).
 - Login page shows plain-language errors (`friendlyError`).
+- `.gitattributes` forces LF for shell scripts (`*.sh text eol=lf`). Requirements-file CRLF warnings remain harmless.
