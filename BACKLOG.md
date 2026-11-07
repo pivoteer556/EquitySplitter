@@ -17,7 +17,7 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 1. ~~Make the API base URL configurable at build time.~~ Done: `src/environments/environment.ts` (local) and `environment.production.ts` (live API) swapped by `fileReplacements`.
 2. ~~Backend CORS: read extra allowed origins from an env var.~~ Done: `CORS_ALLOW_ORIGINS` (comma-separated). Step 4 sets it on the Container App.
 3. Terraform `azurerm_static_web_app` (Free, eastus2) plus outputs. Code written and validated; AWAITING user `terraform plan` + `apply`. User prerequisite: `az provider register --namespace Microsoft.Web --wait`. User runs `terraform apply`.
-4. Set the CORS origin on the Container App (Terraform env var) and add the frontend deploy step in CI (SWA deploy token as a GitHub secret; ask the user first).
+4. Code written and pushed: `CORS_ALLOW_ORIGINS` env on the Container App (Terraform; AWAITING user `plan` + `apply`) and `.github/workflows/deploy-frontend.yml` (token upload; first run pending).
 5. Verify the live site end to end (sign-in against the real API); until then the hosted UI is unverified.
 
 ## 2. UI (in order)

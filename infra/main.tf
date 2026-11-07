@@ -172,6 +172,10 @@ resource "azurerm_container_app" "api" {
         value = tostring(var.jwt_rotation_days)
       }
       env {
+        name  = "CORS_ALLOW_ORIGINS"
+        value = "https://${azurerm_static_web_app.web.default_host_name}"
+      }
+      env {
         name        = "DATABASE_URL"
         secret_name = "database-url"
       }
