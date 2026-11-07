@@ -22,9 +22,9 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 2. ~~Backend CORS: read extra allowed origins from an env var.~~ **Done** e36723b: `CORS_ALLOW_ORIGINS` (comma-separated).
 3. ~~Terraform `azurerm_static_web_app` (Free, eastus2) plus outputs.~~ **Code done** be30b7d. User plan showed `1 to add, 0 to change, 0 to destroy`. The user then created the deploy-token GitHub secret, which implies the apply happened; the site URL is not yet confirmed to me.
 4. Set the CORS origin on the Container App and add the frontend deploy step in CI.
-   - ~~Terraform: `CORS_ALLOW_ORIGINS` env on the Container App.~~ **Code done** 9010f7b. AWAITING the user's `terraform plan` + `apply`.
-   - ~~`.github/workflows/deploy-frontend.yml` (token upload, SPA fallback config).~~ **Code done** 99005ce. First real run pending.
-5. Verify the live site end to end (sign-in against the real API); until then the hosted UI is unverified.
+   - ~~Terraform: `CORS_ALLOW_ORIGINS` env on the Container App.~~ **Done** 9010f7b; user applied. Verified 2026-11-07: a preflight from the site origin gets `access-control-allow-origin` echoed, an unknown origin gets 400.
+   - ~~`.github/workflows/deploy-frontend.yml` (token upload, SPA fallback config).~~ **Done** 99005ce + 9321529 (dropped the invalid `skip_api_build` input). First two runs failed with "deployment_token provided was invalid" (secret set via a PowerShell pipe); the token was re-set with `--body` and the third run succeeded. Site: https://gray-sand-05d747c0f.4.azurestaticapps.net
+5. Verify the live site end to end. **Partly verified** 2026-11-07: `/`, `/login`, `/workbench` return the Angular app (SPA fallback works), the served bundle calls the live API and no localhost, and a login request from the site origin reaches the API with CORS allowed (the API answered 403 "Password reset required" for an unknown email, by design). **Still unverified:** a real sign-in in a browser (needs an account in the live database; ask the user first).
 
 ## 2. UI (in order)
 
@@ -86,7 +86,8 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 - Rollback commands.
 - ~~That Terraform ignores the image and port changes against real state.~~ **Verified** 2026-11-07: the user's `terraform plan` showed `0 to change` for the Container App.
 - The CI `pip-audit` step only guards pushes; a CVE published later is caught on the next run.
-- The frontend deploy workflow and the hosted site have never run; the CORS env var is not applied.
+- ~~The frontend deploy workflow and the hosted site have never run; the CORS env var is not applied.~~ **Verified** 2026-11-07, see section 1 steps 4-5.
+- A real browser sign-in on the hosted site; the first account on the live database.
 
 ## Done (earlier work, before this file existed)
 
