@@ -66,6 +66,12 @@ variable "postgres_location" {
   default     = null
 }
 
+variable "postgres_server_name" {
+  description = "Name of the PostgreSQL server; null means \"<name_prefix>-pg\". Set it to work around a stuck leftover server holding the default name."
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   description = "Tags applied to every resource."
   type        = map(string)

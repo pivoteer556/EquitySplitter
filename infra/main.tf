@@ -59,7 +59,7 @@ resource "azurerm_container_app_environment" "main" {
 # the minimum change.
 
 resource "azurerm_postgresql_flexible_server" "main" {
-  name                   = "${var.name_prefix}-pg"
+  name                   = coalesce(var.postgres_server_name, "${var.name_prefix}-pg")
   resource_group_name    = data.azurerm_resource_group.main.name
   location               = coalesce(var.postgres_location, var.location)
   version                = "16"
