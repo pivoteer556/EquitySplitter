@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { ApiService } from './api.service';
+import { friendlyError } from './error-message';
 
 @Component({
   selector: 'app-login-page',
@@ -45,8 +46,7 @@ export class LoginPageComponent {
         this.router.navigateByUrl('/workbench');
       },
       error: (err) => {
-        const e = err as { error?: unknown; message?: string };
-        this.error = JSON.stringify(e.error ?? e.message ?? err, null, 2);
+        this.error = friendlyError(err);
         this.loading = false;
       },
     });
@@ -63,8 +63,7 @@ export class LoginPageComponent {
         this.router.navigateByUrl('/workbench');
       },
       error: (err) => {
-        const e = err as { error?: unknown; message?: string };
-        this.error = JSON.stringify(e.error ?? e.message ?? err, null, 2);
+        this.error = friendlyError(err);
         this.loading = false;
       },
     });
