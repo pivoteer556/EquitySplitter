@@ -1,7 +1,11 @@
 # Backlog
 
-Ordered list of remaining work. One item per change, each proven by a check that fails before and passes after.
+Ordered list of work. One item per change, each proven by a check that fails before and passes after.
 Update this file in the same commit that finishes an item.
+
+**Items are never deleted.** A finished item is struck through (`~~like this~~`) and annotated with **Done**, the
+commit that finished it, and what is still unverified. The backlog doubles as an audit trail of what was asked, what
+was done, and how it was checked.
 
 ## Direction: HTML-first UI
 
@@ -14,20 +18,21 @@ talk to the API without script.
 
 Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Steps, in order, one commit each:
 
-1. ~~Make the API base URL configurable at build time.~~ Done: `src/environments/environment.ts` (local) and `environment.production.ts` (live API) swapped by `fileReplacements`.
-2. ~~Backend CORS: read extra allowed origins from an env var.~~ Done: `CORS_ALLOW_ORIGINS` (comma-separated). Step 4 sets it on the Container App.
-3. Terraform `azurerm_static_web_app` (Free, eastus2) plus outputs. Code written and validated; AWAITING user `terraform plan` + `apply`. User prerequisite: `az provider register --namespace Microsoft.Web --wait`. User runs `terraform apply`.
-4. Code written and pushed: `CORS_ALLOW_ORIGINS` env on the Container App (Terraform; AWAITING user `plan` + `apply`) and `.github/workflows/deploy-frontend.yml` (token upload; first run pending).
+1. ~~Make the API base URL configurable at build time (was hard-coded `http://127.0.0.1:8000/api/v1` in `api.service.ts`).~~ **Done** 0cdb31b: `src/environments/environment.ts` (local) and `environment.production.ts` (live API) swapped by `fileReplacements`.
+2. ~~Backend CORS: read extra allowed origins from an env var.~~ **Done** e36723b: `CORS_ALLOW_ORIGINS` (comma-separated).
+3. ~~Terraform `azurerm_static_web_app` (Free, eastus2) plus outputs.~~ **Code done** be30b7d. User plan showed `1 to add, 0 to change, 0 to destroy`. The user then created the deploy-token GitHub secret, which implies the apply happened; the site URL is not yet confirmed to me.
+4. Set the CORS origin on the Container App and add the frontend deploy step in CI.
+   - ~~Terraform: `CORS_ALLOW_ORIGINS` env on the Container App.~~ **Code done** 9010f7b. AWAITING the user's `terraform plan` + `apply`.
+   - ~~`.github/workflows/deploy-frontend.yml` (token upload, SPA fallback config).~~ **Code done** 99005ce. First real run pending.
 5. Verify the live site end to end (sign-in against the real API); until then the hosted UI is unverified.
 
 ## 2. UI (in order)
 
-1. Login page as a real `<form>`: labels, `type=email`, native validation, Enter submits, `role="alert"` on errors,
-   no demo prefills, bootstrap separated from sign-in, separate loading state per form.
+1. Login page as a real `<form>`. ~~Sign-in section: labels, `type=email`, native validation, Enter submits, `role="alert"` on errors.~~ **Done** 079e0e8. Still open: no demo prefills, bootstrap separated from sign-in, separate loading state per form.
 2. Workbench page: replace raw JSON output/errors with `friendlyError`, then real forms and result views.
 3. Page copy and shell: drop "Feature 1 Workbench" jargon; navigation and sign-out.
 4. Success feedback (toast via `popover`, no library) and a responsive layout.
-5. Fix stale `src/app/app.spec.ts` ("Hello, app"), then run `ng test` in CI (the `frontend` job only builds today).
+5. ~~Fix stale `src/app/app.spec.ts` ("Hello, app"), then run `ng test` in CI (the `frontend` job only built).~~ **Done** 63296ad (spec) and 494a9f4 (CI step; ran green on GitHub).
 6. Frontend calls accept-invite and shows `inviteToken`.
 
 ## 3. Deploy hardening
@@ -49,7 +54,12 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 ## 6. Smaller items
 
 - Complexity guardrails (ruff, no new dependency): enable `C901` (mccabe, max-complexity 8) and `PLR0911`/`PLR0912`/`PLR0913`/`PLR0915` (returns, branches, args, statements) in `pyproject.toml`. Measured 2026-11-07: zero findings today, so this is a free ratchet. Test = a throwaway function over the limit fails `ruff check`. Function length by lines has no ruff rule (`PLR0915` counts statements); `lizard` could add NLOC if wanted.
-- Review the ~82 lines over 120 for structural causes (long query chains, deep nesting, fat route handlers) before rewrapping blindly. Complexity metrics show nothing wrong, so this is likely long strings/signatures, but it is unverified.
+- Review the ~82 lines over 120 (now rewrapped) for structural causes (long query chains, deep nesting, fat route handlers). Complexity metrics show nothing wrong, so this is likely long strings/signatures, but it is unverified.
+- ~~Ruff line-length 200 -> 120: set it in `pyproject.toml` and rewrap the lines over 120.~~ **Done** f799e16 (82 lines rewrapped with `ruff format` on the affected files).
+- ~~Set `postgres_location` default to `canadacentral` in `infra/variables.tf`.~~ **Done** a163a2f. The user's plan showed no change to the Postgres server.
+- ~~Migrate `@app.on_event` to a lifespan handler.~~ **Done** 5f8a62c (no deprecation warning; startup verified against a local Postgres).
+- ~~alembic `env.py` `%` escaping bug.~~ **Done** 6f09807.
+- ~~`.gitattributes` (`*.sh text eol=lf`) to stop CRLF checkouts of shell scripts.~~ **Done** 98cea4e. LF for requirements files was not added; those CRLF warnings are harmless.
 - Resolve the `httpx` vs `httpx2` Starlette deprecation warning.
 - Bump Node 20 actions (`actions/checkout@v4`, `setup-python@v5`, `azure/login@v2`) if newer majors exist.
 - Dependabot and/or a scheduled pip-audit job (CI only audits at push time).
@@ -60,9 +70,10 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 
 ## Decisions (user, 2026-11-07)
 
-- Ruff line length: shorten from 200; plan is 120 (82 lines to rewrap), revisit 88 later.
-- Postgres region: canadacentral (eastus2 failed). Make it the `postgres_location` default in `infra/variables.tf`.
-- Frontend errors: the more HTML-native scheme. Inline native validation (`:user-invalid`) plus a `role="alert"` region for server errors; `popover` toasts for confirmations; no library.
+- Ruff line length: shorten from 200 to 120; revisit 88 later. *Applied: f799e16.*
+- Postgres region: canadacentral (eastus2 failed). *Applied: a163a2f.*
+- Frontend errors: the more HTML-native scheme. Inline native validation (`:user-invalid`) plus a `role="alert"` region for server errors; `popover` toasts for confirmations; no library. *In progress (sign-in form done).*
+- Backlog items are struck through, never deleted (governance/audit trail). *Applied: this file.*
 
 ## Open decisions (user)
 
@@ -72,16 +83,12 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 
 - Token behaviour live (the deploy smoke test only hits `/health`).
 - Rollback commands.
-- That Terraform ignores the image and port changes against real state (run `terraform plan`).
+- ~~That Terraform ignores the image and port changes against real state.~~ **Verified** 2026-11-07: the user's `terraform plan` showed `0 to change` for the Container App.
 - The CI `pip-audit` step only guards pushes; a CVE published later is caught on the next run.
+- The frontend deploy workflow and the hosted site have never run; the CORS env var is not applied.
 
-## Done
+## Done (earlier work, before this file existed)
 
-- Dependency CVEs: fastapi/starlette, PyJWT, pytest/httpx moved to dev, pip-audit CI gate.
-- Intermittent CI failure: SQLite NUMERIC affinity on `postgresql.UUID` in tests (fixed with a `CHAR(32)` hook).
-- Login page shows plain-language errors (`friendlyError`).
-- `.gitattributes` forces LF for shell scripts (`*.sh text eol=lf`). Requirements-file CRLF warnings remain harmless.
-- `@app.on_event` replaced by a lifespan handler (no deprecation warning; startup verified against Postgres).
-- alembic `env.py` handles `%` in `DATABASE_URL`.
-- Ruff line length is 120 (82 lines rewrapped with `ruff format` on the affected files).
-- `postgres_location` defaults to canadacentral (user to confirm with `terraform plan`: expect no changes).
+- ~~Dependency CVEs.~~ **Done**: fastapi/starlette 0fc6816, PyJWT 917cbc9, pytest/httpx moved to dev 627a109, pip-audit CI gate 6cde252 (ran green on GitHub).
+- ~~Intermittent CI failure.~~ **Done** 18a8f30: SQLite NUMERIC affinity on `postgresql.UUID` in tests, fixed with a `CHAR(32)` hook plus a regression test.
+- ~~Login page shows raw JSON errors.~~ **Done** 9239553: plain-language errors via `friendlyError`.
