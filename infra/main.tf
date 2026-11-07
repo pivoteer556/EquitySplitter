@@ -190,3 +190,18 @@ resource "azurerm_container_app" "api" {
     ignore_changes = [template[0].container[0].image, ingress[0].target_port]
   }
 }
+
+# --- Frontend hosting (Static Web Apps, Free tier) ---
+# Static Web Apps exist in only a few regions (westus2, centralus, eastus2, westeurope,
+# eastasia); the default var.location (eastus2) is one of them. If you change var.location,
+# keep it in that list or the apply fails. Needs the Microsoft.Web provider registered on
+# the subscription. The site content is deployed later by CI with the api_key output.
+
+resource "azurerm_static_web_app" "web" {
+  name                = "${var.name_prefix}-web"
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.location
+  sku_tier            = "Free"
+  sku_size            = "Free"
+  tags                = var.tags
+}

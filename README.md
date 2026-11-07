@@ -55,8 +55,9 @@ migrations to a real Postgres, builds the Angular frontend, and builds the Docke
 
 ## Hosting (Azure)
 `infra/` holds Terraform for Azure: Container Apps (scale to zero), Container Registry, Postgres Flexible Server
-(B1ms), Key Vault, and a GitHub OIDC identity for the deploy workflow. CI only runs `terraform fmt -check`
-and `validate`.
+(B1ms), Key Vault, a Static Web App (Free) for the frontend, and a GitHub OIDC identity for the deploy workflow.
+The Static Web App needs `az provider register --namespace Microsoft.Web --wait` once; the hosted site is not yet
+deployed or verified. CI only runs `terraform fmt -check` and `validate`.
 
 The deploy workflow (`.github/workflows/deploy.yml`) runs after CI passes on master. It builds the image and pushes
 it to ACR, switches the ingress port to 8000, updates the Container App, then smoke-tests it with

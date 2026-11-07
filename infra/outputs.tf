@@ -1,4 +1,5 @@
-# Only what step 2 (build/push/deploy) needs. No secrets.
+# Only what step 2 (build/push/deploy) and frontend hosting need. The only secret is
+# static_web_app_api_key (sensitive).
 
 output "resource_group_name" {
   value = data.azurerm_resource_group.main.name
@@ -35,4 +36,19 @@ output "github_client_id" {
 
 output "key_vault_name" {
   value = azurerm_key_vault.main.name
+}
+
+output "static_web_app_name" {
+  value = azurerm_static_web_app.web.name
+}
+
+output "static_web_app_url" {
+  value = "https://${azurerm_static_web_app.web.default_host_name}"
+}
+
+# The one secret output: the Static Web Apps deployment token, to be copied into a GitHub
+# secret. Read it with `terraform output -raw static_web_app_api_key`. It is also in state.
+output "static_web_app_api_key" {
+  value     = azurerm_static_web_app.web.api_key
+  sensitive = true
 }

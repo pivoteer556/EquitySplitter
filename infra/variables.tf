@@ -20,6 +20,7 @@
 #                (subject "repo:${var.github_repository}:ref:refs/heads/master"),
 #                AcrPush on azurerm_container_registry.main,
 #                Contributor on azurerm_container_app.api only.
+#   main.tf      azurerm_static_web_app.web (Free; default_host_name, api_key = deployment token).
 
 variable "subscription_id" {
   description = "Azure subscription ID to deploy into."
