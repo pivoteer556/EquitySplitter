@@ -110,7 +110,7 @@ resource "azuread_application_federated_identity_credential" "github" {
   display_name   = "github-master"
   issuer         = "https://token.actions.githubusercontent.com"
   audiences      = ["api://AzureADTokenExchange"]
-  subject        = "repo:${var.github_repository}:ref:refs/heads/master"
+  subject        = "${coalesce(var.github_oidc_repo_claim, "repo:${var.github_repository}")}:ref:refs/heads/master"
 }
 
 # Least privilege for the deploy workflow: push images, and update the one Container App.

@@ -37,6 +37,12 @@ variable "github_repository" {
   }
 }
 
+variable "github_oidc_repo_claim" {
+  description = "The repo part of the OIDC subject GitHub issues for this repository, i.e. the sub_claim_prefix from `gh api repos/OWNER/REPO/actions/oidc/customization/sub`. Newer repositories use immutable IDs (owner@id/repo@id) instead of owner/repo. Null means repo:<github_repository>."
+  type        = string
+  default     = "repo:pivoteer556@39782199/EquitySplitter@1447820242"
+}
+
 variable "name_prefix" {
   description = "Prefix for all resource names. Lowercase letters, digits and hyphens."
   type        = string
