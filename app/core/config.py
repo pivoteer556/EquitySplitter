@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # Number of reverse proxies in front of the app that append to X-Forwarded-For (0 = trust none).
     # Azure Container Apps ingress is 1. Only the rightmost N entries are trusted.
     trusted_proxy_hops: int = 0
+    # Extra browser origins allowed by CORS, comma-separated (e.g. the deployed frontend URL).
+    # http://localhost:4200 and http://127.0.0.1:4200 are always allowed.
+    cors_allow_origins: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -49,13 +49,23 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             rotation_task = None
 
 
+LOCAL_ORIGINS = ["http://localhost:4200", "http://127.0.0.1:4200"]
+
+
+def cors_origins(extra: str) -> list[str]:
+    """Local dev origins plus the comma-separated extras (trailing slash stripped; `*` and duplicates dropped)."""
+    origins = list(LOCAL_ORIGINS)
+    for item in extra.split(","):
+        origin = item.strip().rstrip("/")
+        if origin and origin != "*" and origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:4200",
-        "http://127.0.0.1:4200",
-    ],
+    allow_origins=cors_origins(settings.cors_allow_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

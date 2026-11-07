@@ -37,6 +37,9 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   `/auth/accept-invite` uses the same limit (10 attempts per hour per IP, every attempt counted) but with its own
   per-IP budget, separate from register/bootstrap. These are per-IP application-level throttles against guessing and
   abuse, not DDoS protection; volumetric attacks must be absorbed at the edge (e.g. Azure Front Door / WAF).
+- **CORS** — `http://localhost:4200` and `http://127.0.0.1:4200` are always allowed. Set `CORS_ALLOW_ORIGINS` to a
+  comma-separated list of extra origins (e.g. `https://site.example.net,https://other.example`) to allow a deployed
+  frontend. Whitespace, empty entries, trailing slashes and `*` are ignored.
 - Invited owners start without a password. When the invitee has none, `POST /properties/{id}/owners` returns an
   `inviteToken` (re-inviting issues a fresh one); the loan officer hands it over out-of-band and the invitee POSTs
   `{token, password}` to `/auth/accept-invite` to set a password and get an access token. Tokens expire after 7 days
