@@ -1,5 +1,6 @@
 # Conventions for every file in infra/ (main.tf, outputs.tf, ...):
-#   - Resource names are "${var.name_prefix}-<role>" (e.g. "${var.name_prefix}-rg").
+#   - Resource names are "${var.name_prefix}-<role>" (e.g. "${var.name_prefix}-env"). The
+#     resource group is the exception: it already exists (var.resource_group_name, data source).
 #     The ACR name allows alphanumerics only: replace(var.name_prefix, "-", "") + "acr".
 #   - Every resource that supports tags sets `tags = var.tags`.
 #   - Secrets are never inputs: they are generated (random_password, alphanumeric only)
@@ -45,6 +46,12 @@ variable "name_prefix" {
     condition     = can(regex("^[a-z0-9-]{3,30}$", var.name_prefix))
     error_message = "name_prefix must be 3-30 characters of lowercase letters, digits or hyphens."
   }
+}
+
+variable "resource_group_name" {
+  description = "Name of the EXISTING resource group to deploy into (not created by Terraform)."
+  type        = string
+  default     = "Equity-Splitter-Dev"
 }
 
 variable "location" {

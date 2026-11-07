@@ -35,8 +35,8 @@ resource "azurerm_key_vault" "main" {
   # Residual limit: a name_prefix with an inner "--" or a leading digit yields an invalid
   # vault name; the default prefix is fine.
   name                = "${trim(substr(var.name_prefix, 0, 15), "-")}-kv-${random_string.key_vault_suffix.result}"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.location
   tenant_id           = data.azurerm_client_config.current.tenant_id
   sku_name            = "standard"
   tags                = var.tags

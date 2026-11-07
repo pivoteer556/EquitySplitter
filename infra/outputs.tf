@@ -1,7 +1,7 @@
 # Only what step 2 (build/push/deploy) needs. No secrets.
 
 output "resource_group_name" {
-  value = azurerm_resource_group.main.name
+  value = data.azurerm_resource_group.main.name
 }
 
 output "acr_name" {

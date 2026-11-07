@@ -1,7 +1,8 @@
-resource "azurerm_resource_group" "main" {
-  name     = "${var.name_prefix}-rg"
-  location = var.location
-  tags     = var.tags
+# The resource group is created outside Terraform (portal) and only looked up here, so
+# `terraform destroy` leaves it in place. Resources use var.location, not the group's own
+# location, so the region stays under this config's control.
+data "azurerm_resource_group" "main" {
+  name = var.resource_group_name
 }
 
 # --- Container registry + pull identity ---
@@ -12,8 +13,8 @@ resource "azurerm_resource_group" "main" {
 
 resource "azurerm_container_registry" "main" {
   name                = "${replace(var.name_prefix, "-", "")}acr"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.location
   sku                 = "Basic"
   admin_enabled       = false
   tags                = var.tags
@@ -21,8 +22,8 @@ resource "azurerm_container_registry" "main" {
 
 resource "azurerm_user_assigned_identity" "app" {
   name                = "${var.name_prefix}-id"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.location
   tags                = var.tags
 }
 
@@ -36,8 +37,8 @@ resource "azurerm_role_assignment" "acr_pull" {
 
 resource "azurerm_log_analytics_workspace" "main" {
   name                = "${var.name_prefix}-logs"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
+  resource_group_name = data.azurerm_resource_group.main.name
+  location            = var.location
   sku                 = "PerGB2018"
   retention_in_days   = 30
   tags                = var.tags
@@ -45,8 +46,8 @@ resource "azurerm_log_analytics_workspace" "main" {
 
 resource "azurerm_container_app_environment" "main" {
   name                       = "${var.name_prefix}-env"
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = azurerm_resource_group.main.location
+  resource_group_name        = data.azurerm_resource_group.main.name
+  location                   = var.location
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
   tags                       = var.tags
 }
@@ -59,8 +60,8 @@ resource "azurerm_container_app_environment" "main" {
 
 resource "azurerm_postgresql_flexible_server" "main" {
   name                   = "${var.name_prefix}-pg"
-  resource_group_name    = azurerm_resource_group.main.name
-  location               = azurerm_resource_group.main.location
+  resource_group_name    = data.azurerm_resource_group.main.name
+  location               = var.location
   version                = "16"
   sku_name               = "B_Standard_B1ms"
   storage_mb             = 32768
@@ -106,7 +107,7 @@ locals {
 # real image is deployed; this has not been confirmed by an apply.
 resource "azurerm_container_app" "api" {
   name                         = "${var.name_prefix}-api"
-  resource_group_name          = azurerm_resource_group.main.name
+  resource_group_name          = data.azurerm_resource_group.main.name
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
   tags                         = var.tags
