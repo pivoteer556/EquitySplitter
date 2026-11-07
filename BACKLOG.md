@@ -34,6 +34,7 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 4. Success feedback (toast via `popover`, no library) and a responsive layout.
 5. ~~Fix stale `src/app/app.spec.ts` ("Hello, app"), then run `ng test` in CI (the `frontend` job only built).~~ **Done** 63296ad (spec) and 494a9f4 (CI step; ran green on GitHub).
 6. Frontend calls accept-invite and shows `inviteToken`.
+7. End-to-end browser tests with Playwright, written adversarially (try to break sign-in: injection, double-submit, bad tokens, 4xx/5xx/offline). User chose Playwright option 1, 2026-11-07. Steps: (a) harness + adversarial sign-in suite against a faked API (IN PROGRESS); (b) run in CI with Chrome; (c) workbench flows; (d) run against the hosted site once step 5 of section 1 is done.
 
 ## 3. Deploy hardening
 
