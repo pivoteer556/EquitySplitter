@@ -10,7 +10,17 @@ Prefer native platform features over TypeScript: real `<form>` elements with `re
 CSS `:has()` / container queries / nesting. Keep Angular bindings and `friendlyError` only where a plain page cannot
 talk to the API without script.
 
-## 1. UI (in order)
+## 1. Frontend hosting (top priority, user 2026-11-07)
+
+Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Steps, in order, one commit each:
+
+1. Make the API base URL configurable at build time (currently hard-coded `http://127.0.0.1:8000/api/v1` in `api.service.ts`); `ng serve` must keep working locally. No account needed.
+2. Backend CORS: read extra allowed origins from an env var (today only the two localhost origins). No account needed.
+3. Terraform `azurerm_static_web_app` (Free, eastus2) plus outputs. User prerequisite: `az provider register --namespace Microsoft.Web --wait`. User runs `terraform apply`.
+4. Set the CORS origin on the Container App (Terraform env var) and add the frontend deploy step in CI (SWA deploy token as a GitHub secret; ask the user first).
+5. Verify the live site end to end (sign-in against the real API); until then the hosted UI is unverified.
+
+## 2. UI (in order)
 
 1. Login page as a real `<form>`: labels, `type=email`, native validation, Enter submits, `role="alert"` on errors,
    no demo prefills, bootstrap separated from sign-in, separate loading state per form.
@@ -20,17 +30,11 @@ talk to the API without script.
 5. Fix stale `src/app/app.spec.ts` ("Hello, app"), then run `ng test` in CI (the `frontend` job only builds today).
 6. Frontend calls accept-invite and shows `inviteToken`.
 
-## 2. Deploy hardening
+## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).
 - Branch protection with required checks; a `production` GitHub environment with approval.
 - Migrations handling (the entrypoint already runs alembic; unverified against the live Azure Postgres).
-
-## 3. Frontend hosting
-
-- Azure Static Web Apps (Free) in Terraform. Prerequisite: the user registers `Microsoft.Web`.
-- Make the API base URL (hard-coded `http://127.0.0.1:8000/api/v1` in `api.service.ts`) configurable at build time.
-- Add the SWA origin to backend CORS via an env var; add the frontend deploy step (SWA token as a GitHub secret).
 
 ## 4. Static analysis
 
