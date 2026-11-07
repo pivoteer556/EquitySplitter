@@ -29,6 +29,10 @@ jobs:
       # Type-check once; mypy config (packages = ["app"]) lives in pyproject.toml.
       - run: mypy
         if: matrix.python-version == '3.12'
+      # Fail the build if a production pin (requirements.txt, what Docker ships) has a known CVE.
+      # Audits requirements.txt only, not the dev tools; runs once, and needs network (PyPI/OSV).
+      - run: pip-audit -r requirements.txt
+        if: matrix.python-version == '3.12'
 
   migrations:
     runs-on: ubuntu-latest

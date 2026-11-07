@@ -1,6 +1,7 @@
 -r requirements.txt
 ruff==0.8.6
 mypy==2.4.1
-# Test-only deps (pytest, httpx for FastAPI TestClient) live here so requirements.txt, which Docker ships, stays runtime-only.
+# Test deps (pytest, httpx for FastAPI TestClient) and CI tooling (pip-audit) live here so requirements.txt, which Docker ships, stays runtime-only.
 pytest==9.0.3
 httpx==0.28.1
+pip-audit==2.10.1
