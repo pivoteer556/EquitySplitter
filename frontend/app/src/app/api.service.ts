@@ -2,6 +2,8 @@ import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable, tap } from 'rxjs';
 
+import { environment } from '../environments/environment';
+
 import {
   Acknowledgement,
   AuthTokenResponse,
@@ -16,7 +18,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private readonly baseUrl = 'http://127.0.0.1:8000/api/v1';
+  private readonly baseUrl = environment.apiBaseUrl;
   private readonly institutionTokenStorageKey = 'institutionToken';
   private readonly userTokenStorageKey = 'userToken';
   private readonly institutionIdStorageKey = 'institutionId';
