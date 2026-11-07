@@ -66,3 +66,10 @@ jobs:
           --name "${{ vars.CONTAINER_APP_NAME }}"
           --resource-group "${{ vars.RESOURCE_GROUP_NAME }}"
           --image "$IMAGE"
+
+      # Fail the deploy if the new revision does not answer /health with 200. The script
+      # retries for up to 120 s because the app scales to zero and cold starts are slow.
+      # Invoked via bash so the file's git mode bit does not matter.
+      - run: |
+          fqdn="$(az containerapp show --name "${{ vars.CONTAINER_APP_NAME }}" --resource-group "${{ vars.RESOURCE_GROUP_NAME }}" --query properties.configuration.ingress.fqdn -o tsv)"
+          bash scripts/smoke_test.sh "https://${fqdn}"

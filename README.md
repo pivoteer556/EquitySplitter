@@ -52,8 +52,15 @@ migrations to a real Postgres, builds the Angular frontend, and builds the Docke
 
 ## Hosting (Azure)
 `infra/` holds Terraform for Azure: Container Apps (scale to zero), Container Registry, Postgres Flexible Server
-(B1ms), Key Vault, and a GitHub OIDC identity for the upcoming deploy workflow. CI only runs `terraform fmt -check`
-and `validate`; a deploy workflow is the next step.
+(B1ms), Key Vault, and a GitHub OIDC identity for the deploy workflow. CI only runs `terraform fmt -check`
+and `validate`.
+
+The deploy workflow (`.github/workflows/deploy.yml`) runs after CI passes on master. It builds the image and pushes
+it to ACR, switches the ingress port to 8000, updates the Container App, then smoke-tests it with
+`scripts/smoke_test.sh`, which fails the deploy unless `GET /health` returns HTTP 200 (it retries for up to 120 s,
+since the app scales to zero; override with `SMOKE_TIMEOUT_SECONDS`). The first deploy was confirmed live on
+2026-11-07: `/health` returns `{"status":"ok"}`. The root path returns 404 `{"detail":"Not Found"}`, which is
+expected: this is an API with no page at `/`.
 
 Apply it yourself (needs rights to create Entra app registrations and role assignments):
 ```
@@ -76,7 +83,17 @@ Accepted risks and caveats:
 - Postgres is publicly reachable (with the "allow Azure services" firewall rule); there is no VNet.
 - The first apply creates the Container App from a public placeholder image (`mcr.microsoft.com/k8se/quickstart`)
   with ingress on port 80; the deploy workflow switches the image and the ingress port (8000), and Terraform ignores
-  later changes to both. Not yet confirmed by an apply.
+  later changes to both.
+
+### Rollback (NOT YET TESTED)
+Container Apps keep prior revisions, so a bad deploy should be reversible, but none of this has been tried here:
+```
+az containerapp revision list -n equitysplitter-api -g Equity-Splitter-Dev -o table
+az containerapp ingress traffic set -n equitysplitter-api -g Equity-Splitter-Dev --revision-weight <previous-revision>=100
+```
+Uncertainty: the app is in single-revision mode by default, where only the latest revision is active and receives
+all traffic. You may first need `az containerapp revision activate` on the old revision and/or switch the app to
+multiple-revision mode (`az containerapp revision set-mode --mode multiple`) before traffic can be split.
 
 ## Run
 1. Create and activate a virtual environment.
