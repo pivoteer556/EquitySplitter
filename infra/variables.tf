@@ -96,12 +96,6 @@ variable "postgres_database_name" {
 
 # --- Container App ---
 
-variable "container_port" {
-  description = "Port uvicorn listens on in the container (scripts/entrypoint.sh)."
-  type        = number
-  default     = 8000
-}
-
 # --- App settings (env vars read by app/core/config.py) ---
 
 variable "jwt_exp_minutes" {

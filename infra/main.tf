@@ -101,10 +101,10 @@ locals {
 
 # The registry has no image on a first apply, so the app starts from a public placeholder
 # image and the real image is deployed later (separate deploy workflow). ignore_changes on
-# the image keeps `terraform apply` from reverting such a deploy.
-# UNVERIFIED RISK: the placeholder listens on port 80 but ingress targets var.container_port
-# (8000). Creation is expected to succeed, with the revision reporting unhealthy until the
-# real image is deployed; this has not been confirmed by an apply.
+# the image and the ingress target port keeps `terraform apply` from reverting such a deploy.
+# The placeholder listens on port 80, so ingress starts there; the deploy workflow
+# (.github/workflows/deploy.yml) switches the port to 8000, where the real image (uvicorn,
+# scripts/entrypoint.sh) listens. That 8000 is hard-coded in the workflow, not read from here.
 resource "azurerm_container_app" "api" {
   name                         = "${var.name_prefix}-api"
   resource_group_name          = data.azurerm_resource_group.main.name
@@ -137,7 +137,7 @@ resource "azurerm_container_app" "api" {
 
   ingress {
     external_enabled = true
-    target_port      = var.container_port
+    target_port      = 80 # placeholder image port; the deploy workflow changes it to 8000
 
     traffic_weight {
       latest_revision = true
@@ -187,6 +187,6 @@ resource "azurerm_container_app" "api" {
   depends_on = [azurerm_role_assignment.acr_pull, azurerm_role_assignment.app_key_vault_reader]
 
   lifecycle {
-    ignore_changes = [template[0].container[0].image]
+    ignore_changes = [template[0].container[0].image, ingress[0].target_port]
   }
 }

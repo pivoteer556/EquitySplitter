@@ -1,0 +1,68 @@
+name: Deploy
+
+# workflow_run workflows always execute from the default branch's workflow file with
+# GITHUB_REF=refs/heads/<default branch>, so the OIDC subject is
+# repo:pivoteer556/EquitySplitter:ref:refs/heads/master as the federated credential expects
+# (infra/identity.tf). The CI-gate below keeps non-master / PR runs out.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+# OIDC token for azure/login; nothing else needs repo write access.
+permissions:
+  id-token: write
+  contents: read
+
+# Never overlap deploys, and never kill one mid-flight (a half-applied update is worse).
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # event == 'push' also excludes fork PRs whose head branch happens to be named "master".
+    # Manual dispatch is always allowed (login only succeeds from master: OIDC subject).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'master' &&
+       github.event.workflow_run.event == 'push')
+    env:
+      IMAGE: ${{ vars.ACR_NAME }}.azurecr.io/equitysplitter-api:${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      # Deploy exactly the commit CI validated, not whatever master has moved on to.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # docker build + push rather than `az acr build`: the latter needs ACR Tasks
+      # permissions, which the AcrPush-only role does not grant. `az acr login` only needs
+      # the data-plane push/pull permission.
+      - run: az acr login --name "${{ vars.ACR_NAME }}"
+      - run: docker build -t "$IMAGE" .
+      - run: docker push "$IMAGE"
+
+      # Ingress first, then image. Ingress is app-level config (no new revision); changing
+      # it first means the new image's revision is probed on port 8000 from the start.
+      # Image-first would create a revision whose probes hit the placeholder port (80)
+      # on the very first deploy and never become ready.
+      # Not folded into one call: `az containerapp update` has no ingress port option.
+      - run: >-
+          az containerapp ingress update
+          --name "${{ vars.CONTAINER_APP_NAME }}"
+          --resource-group "${{ vars.RESOURCE_GROUP_NAME }}"
+          --target-port 8000
+      - run: >-
+          az containerapp update
+          --name "${{ vars.CONTAINER_APP_NAME }}"
+          --resource-group "${{ vars.RESOURCE_GROUP_NAME }}"
+          --image "$IMAGE"

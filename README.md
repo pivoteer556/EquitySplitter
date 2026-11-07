@@ -74,9 +74,9 @@ terraform apply -var subscription_id=<id>
 
 Accepted risks and caveats:
 - Postgres is publicly reachable (with the "allow Azure services" firewall rule); there is no VNet.
-- UNVERIFIED: the first apply creates the Container App from a public placeholder image (`mcr.microsoft.com/k8se/quickstart`)
-  that listens on port 80, while ingress targets port 8000. Creation is expected to succeed with the revision unhealthy
-  until the real image is deployed; this has not been confirmed by an apply.
+- The first apply creates the Container App from a public placeholder image (`mcr.microsoft.com/k8se/quickstart`)
+  with ingress on port 80; the deploy workflow switches the image and the ingress port (8000), and Terraform ignores
+  later changes to both. Not yet confirmed by an apply.
 
 ## Run
 1. Create and activate a virtual environment.
