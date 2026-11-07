@@ -6,9 +6,23 @@ from sqlalchemy.orm import Session
 
 from app.api.deps.auth import Principal, require_institution_user, require_user, require_user_property_scope
 from app.db.session import get_db
-from app.models import Institution, InstitutionUser, OwnerAcknowledgement, Property, PropertyAgreement, User, UserProperty
+from app.models import (
+    Institution,
+    InstitutionUser,
+    OwnerAcknowledgement,
+    Property,
+    PropertyAgreement,
+    User,
+    UserProperty,
+)
 from app.schemas.institution import InstitutionCreate, InstitutionRead, InstitutionUserCreate, InstitutionUserRead
-from app.schemas.owner_acknowledgement import AcknowledgementRead, OwnerInviteRead, PropertyDetailRead, PropertyOwnersRead, PropertyOwnerStatus
+from app.schemas.owner_acknowledgement import (
+    AcknowledgementRead,
+    OwnerInviteRead,
+    PropertyDetailRead,
+    PropertyOwnersRead,
+    PropertyOwnerStatus,
+)
 from app.schemas.property import PropertyCreate, PropertyRead
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
@@ -69,7 +83,9 @@ def create_property(
     return prop
 
 
-@router.post("/properties/{propertyId}/agreement", response_model=PropertyAgreementRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/properties/{propertyId}/agreement", response_model=PropertyAgreementRead, status_code=status.HTTP_201_CREATED
+)
 def attach_agreement(
     propertyId: str,
     payload: PropertyAgreementCreate,
@@ -130,16 +146,24 @@ def invite_owner(
         db.add(user)
         db.flush()
 
-    user_property = db.query(UserProperty).filter(UserProperty.userId == user.id, UserProperty.propertyId == prop.id).first()
+    user_property = (
+        db.query(UserProperty).filter(UserProperty.userId == user.id, UserProperty.propertyId == prop.id).first()
+    )
     if user_property is None:
-        user_property = UserProperty(userId=user.id, propertyId=prop.id, maxOwnershipPercent=payload.maxOwnershipPercent)
+        user_property = UserProperty(
+            userId=user.id, propertyId=prop.id, maxOwnershipPercent=payload.maxOwnershipPercent
+        )
         db.add(user_property)
         db.flush()
 
-    existing_ack = db.query(OwnerAcknowledgement).filter(
-        OwnerAcknowledgement.agreementId == agreement.id,
-        OwnerAcknowledgement.userPropertyId == user_property.id,
-    ).first()
+    existing_ack = (
+        db.query(OwnerAcknowledgement)
+        .filter(
+            OwnerAcknowledgement.agreementId == agreement.id,
+            OwnerAcknowledgement.userPropertyId == user_property.id,
+        )
+        .first()
+    )
     if existing_ack is not None:
         return _with_invite_token(db, user, existing_ack)
 
@@ -165,14 +189,22 @@ def acknowledge_agreement(
     if agreement is None:
         raise HTTPException(status_code=404, detail="Agreement not found")
 
-    user_property = db.query(UserProperty).filter(UserProperty.userId == principal.user_id, UserProperty.propertyId == prop.id).first()
+    user_property = (
+        db.query(UserProperty)
+        .filter(UserProperty.userId == principal.user_id, UserProperty.propertyId == prop.id)
+        .first()
+    )
     if user_property is None:
         raise HTTPException(status_code=403, detail="User is not an owner on this property")
 
-    ack = db.query(OwnerAcknowledgement).filter(
-        OwnerAcknowledgement.agreementId == agreement.id,
-        OwnerAcknowledgement.userPropertyId == user_property.id,
-    ).first()
+    ack = (
+        db.query(OwnerAcknowledgement)
+        .filter(
+            OwnerAcknowledgement.agreementId == agreement.id,
+            OwnerAcknowledgement.userPropertyId == user_property.id,
+        )
+        .first()
+    )
     if ack is None:
         raise HTTPException(status_code=404, detail="Acknowledgement record not found")
 
@@ -204,7 +236,9 @@ def get_property(
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     return {
         "property": PropertyRead.model_validate(prop).model_dump(),
-        "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else PropertyAgreementRead.model_validate({}).model_dump(),
+        "agreement": PropertyAgreementRead.model_validate(agreement).model_dump()
+        if agreement
+        else PropertyAgreementRead.model_validate({}).model_dump(),
     }
 
 
@@ -222,14 +256,17 @@ def list_owners(
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     if agreement is None:
-        return {"owners": [PropertyOwnersRead.model_validate({}).model_dump()]}  # return empty owner list if no agreement attached
+        return {
+            "owners": [PropertyOwnersRead.model_validate({}).model_dump()]
+        }  # return empty owner list if no agreement attached
 
     rows = (
         db.query(UserProperty, User, OwnerAcknowledgement)
         .join(User, User.id == UserProperty.userId)
         .join(
             OwnerAcknowledgement,
-            (OwnerAcknowledgement.userPropertyId == UserProperty.id) & (OwnerAcknowledgement.agreementId == agreement.id),
+            (OwnerAcknowledgement.userPropertyId == UserProperty.id)
+            & (OwnerAcknowledgement.agreementId == agreement.id),
             isouter=True,
         )
         .filter(UserProperty.propertyId == prop.id)

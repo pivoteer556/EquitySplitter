@@ -1,6 +1,6 @@
 [tool.ruff]
 # 200: the longest existing line is ~218 (long string/SQL literals); lint without reformatting code.
-line-length = 200
+line-length = 120
 # CI runs 3.12 and 3.14; the Docker image/runtime floor is 3.12.
 target-version = "py312"
 extend-exclude = ["frontend", "node_modules", ".venv", "venv"]

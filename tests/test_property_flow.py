@@ -80,10 +80,14 @@ def test_property_activates_when_all_owners_acknowledge(client, officer):
     assert again.json()["id"] == invite.json()["id"]
 
     # The invited owner has no password; they set one with the invite token the officer hands over.
-    accepted = client.post(f"{API}/auth/accept-invite", json={"token": invite.json()["inviteToken"], "password": STRONG_PASSWORD})
+    accepted = client.post(
+        f"{API}/auth/accept-invite", json={"token": invite.json()["inviteToken"], "password": STRONG_PASSWORD}
+    )
     assert accepted.status_code == 200, accepted.text
 
-    token = client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": STRONG_PASSWORD}).json()["accessToken"]
+    token = client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": STRONG_PASSWORD}).json()[
+        "accessToken"
+    ]
     ack = client.post(f"{API}/properties/{prop['id']}/acknowledge", headers=bearer(token))
     assert ack.status_code == 200
     assert ack.json()["signedAt"] is not None
@@ -101,6 +105,8 @@ def test_property_activates_when_all_owners_acknowledge(client, officer):
 def test_non_owner_cannot_read_or_acknowledge(client, officer):
     prop = _property(client, officer)
     _agreement(client, officer, prop["id"])
-    token = client.post(f"{API}/auth/register", json={"name": "S", "email": "s@example.com", "password": STRONG_PASSWORD}).json()["accessToken"]
+    token = client.post(
+        f"{API}/auth/register", json={"name": "S", "email": "s@example.com", "password": STRONG_PASSWORD}
+    ).json()["accessToken"]
     assert client.post(f"{API}/properties/{prop['id']}/acknowledge", headers=bearer(token)).status_code == 403
     assert client.get(f"{API}/properties/{prop['id']}", headers=bearer(token)).status_code == 403

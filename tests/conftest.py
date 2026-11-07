@@ -15,7 +15,8 @@ from app.main import app
 @compiles(UUID, "sqlite")
 def _uuid_as_char_on_sqlite(type_, compiler, **kw):
     # The models use postgresql.UUID; SQLite would declare the column "UUID" (NUMERIC affinity) and coerce ids that
-    # look like numbers (e.g. 32 digits with one 'e') into floats. CHAR(32) has TEXT affinity and matches the stored hex.
+    # look like numbers (e.g. 32 digits with one 'e') into floats. CHAR(32) has TEXT affinity and matches the stored
+    # hex.
     return "CHAR(32)"
 
 
@@ -41,7 +42,9 @@ def clock(monkeypatch):
 
 @pytest.fixture()
 def session_factory():
-    engine = create_engine("sqlite+pysqlite://", future=True, poolclass=StaticPool, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite+pysqlite://", future=True, poolclass=StaticPool, connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(engine)
     yield sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     engine.dispose()

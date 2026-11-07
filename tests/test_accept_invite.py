@@ -52,7 +52,10 @@ def _signed(session_factory, claims):
 def test_accept_invite_sets_password_and_allows_login(client, officer):
     prop, token = _invited(client, officer)
     # Before accepting, login is refused exactly as before.
-    assert client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code == 403
+    assert (
+        client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code
+        == 403
+    )
 
     resp = _accept(client, token)
     assert resp.status_code == 200, resp.text
@@ -63,7 +66,10 @@ def test_accept_invite_sets_password_and_allows_login(client, officer):
 
     login = client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD})
     assert login.status_code == 200
-    assert client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": "WrongPass123!"}).status_code == 401
+    assert (
+        client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": "WrongPass123!"}).status_code
+        == 401
+    )
 
 
 def test_invite_token_is_single_use(client, officer):
@@ -72,14 +78,25 @@ def test_invite_token_is_single_use(client, officer):
     again = _accept(client, token, "Another789!x")
     assert again.status_code == 401
     # The first password still stands; the second attempt did not overwrite it.
-    assert client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code == 200
+    assert (
+        client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code
+        == 200
+    )
 
 
 def test_expired_invite_token_is_rejected(client, officer, session_factory):
     _invited(client, officer)
     uid = _user_id(session_factory)
     past = datetime.now(UTC) - timedelta(days=1)
-    expired = _signed(session_factory, {"sub": str(uid), "userType": "invite", "iat": int((past - timedelta(days=7)).timestamp()), "exp": int(past.timestamp())})
+    expired = _signed(
+        session_factory,
+        {
+            "sub": str(uid),
+            "userType": "invite",
+            "iat": int((past - timedelta(days=7)).timestamp()),
+            "exp": int(past.timestamp()),
+        },
+    )
     assert _accept(client, expired).status_code == 401
 
 
@@ -92,7 +109,10 @@ def test_access_token_is_not_an_invite_token(client, officer, session_factory):
     access = issue_token(db, uid, "user")  # same subject, valid signature: only the userType can reject it
     db.close()
     assert _accept(client, access).status_code == 401
-    assert client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code == 403
+    assert (
+        client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code
+        == 403
+    )
 
 
 def test_garbage_token_is_rejected(client, officer):

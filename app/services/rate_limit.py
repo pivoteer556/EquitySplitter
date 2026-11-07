@@ -5,6 +5,7 @@ counted attempt, reset(db, key) on success. State lives in the `rateLimitHits` t
 by every replica and survives restarts. Known limit: concurrent requests can slip a few attempts past
 the threshold because check and record are separate statements (acceptable for brute-force throttling).
 """
+
 import hashlib
 import uuid
 from collections.abc import Callable
@@ -54,7 +55,9 @@ class RateLimiter:
     def record_attempt(self, db: Session, key: str) -> None:
         now = self._clock()
         db.execute(delete(RateLimitHit).where(RateLimitHit.expiresAt <= now))  # prune everyone's expired rows
-        db.add(RateLimitHit(id=uuid.uuid4(), key=self._digest(key), expiresAt=now + timedelta(seconds=self.window_seconds)))
+        db.add(
+            RateLimitHit(id=uuid.uuid4(), key=self._digest(key), expiresAt=now + timedelta(seconds=self.window_seconds))
+        )
         db.commit()
 
     def reset(self, db: Session, key: str) -> None:

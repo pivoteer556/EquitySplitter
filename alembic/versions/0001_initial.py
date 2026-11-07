@@ -29,7 +29,12 @@ def upgrade() -> None:
     op.create_table(
         "institutionUsers",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("institutionId", postgresql.UUID(as_uuid=True), sa.ForeignKey("institutions.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "institutionId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("institutions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("role", sa.String(length=50), nullable=False),
@@ -49,7 +54,12 @@ def upgrade() -> None:
     op.create_table(
         "properties",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("institutionId", postgresql.UUID(as_uuid=True), sa.ForeignKey("institutions.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "institutionId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("institutions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("address", sa.String(length=500), nullable=False),
         sa.Column("loanAmount", sa.Numeric(12, 2), nullable=False),
         sa.Column("currentBalance", sa.Numeric(12, 2), nullable=False),
@@ -62,7 +72,12 @@ def upgrade() -> None:
     op.create_table(
         "propertyAgreements",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("propertyId", postgresql.UUID(as_uuid=True), sa.ForeignKey("properties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "propertyId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("properties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("noticeDays", sa.Integer(), nullable=False),
         sa.Column("valuationMethod", sa.String(length=50), nullable=False),
         sa.Column("partialClaimMethod", sa.String(length=50), nullable=False),
@@ -73,8 +88,15 @@ def upgrade() -> None:
     op.create_table(
         "userProperties",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("userId", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("propertyId", postgresql.UUID(as_uuid=True), sa.ForeignKey("properties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "userId", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
+        sa.Column(
+            "propertyId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("properties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("maxOwnershipPercent", sa.Numeric(5, 2), nullable=True),
         sa.Column("createdAt", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
@@ -82,15 +104,30 @@ def upgrade() -> None:
     op.create_table(
         "ownerAcknowledgements",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("agreementId", postgresql.UUID(as_uuid=True), sa.ForeignKey("propertyAgreements.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("userPropertyId", postgresql.UUID(as_uuid=True), sa.ForeignKey("userProperties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "agreementId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("propertyAgreements.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "userPropertyId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("userProperties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("signedAt", sa.DateTime(timezone=True), nullable=True),
     )
 
     op.create_table(
         "paymentCycles",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("userPropertyId", postgresql.UUID(as_uuid=True), sa.ForeignKey("userProperties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "userPropertyId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("userProperties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("dueDate", sa.Date(), nullable=False),
         sa.Column("equityDue", sa.Numeric(12, 2), nullable=False),
         sa.Column("interestDue", sa.Numeric(12, 2), nullable=False),
@@ -103,7 +140,12 @@ def upgrade() -> None:
     op.create_table(
         "payments",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("cycleId", postgresql.UUID(as_uuid=True), sa.ForeignKey("paymentCycles.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "cycleId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("paymentCycles.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("amountPaid", sa.Numeric(12, 2), nullable=False),
         sa.Column("paidAt", sa.DateTime(timezone=True), nullable=True),
     )
@@ -111,8 +153,18 @@ def upgrade() -> None:
     op.create_table(
         "equityLedger",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("userPropertyId", postgresql.UUID(as_uuid=True), sa.ForeignKey("userProperties.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("cycleId", postgresql.UUID(as_uuid=True), sa.ForeignKey("paymentCycles.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "userPropertyId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("userProperties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "cycleId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("paymentCycles.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("baseEquityDelta", sa.Numeric(12, 2), nullable=False),
         sa.Column("bonusEquityDelta", sa.Numeric(12, 2), nullable=False, server_default="0"),
         sa.Column("runningBalance", sa.Numeric(12, 2), nullable=False),
@@ -123,7 +175,12 @@ def upgrade() -> None:
     op.create_table(
         "equityTransfers",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("userPropertyId", postgresql.UUID(as_uuid=True), sa.ForeignKey("userProperties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "userPropertyId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("userProperties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("status", sa.String(length=50), nullable=False),
         sa.Column("askingPrice", sa.Numeric(12, 2), nullable=False),
         sa.Column("sharePercent", sa.Numeric(5, 2), nullable=False),
@@ -134,8 +191,18 @@ def upgrade() -> None:
     op.create_table(
         "transferClaims",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("transferId", postgresql.UUID(as_uuid=True), sa.ForeignKey("equityTransfers.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("userPropertyId", postgresql.UUID(as_uuid=True), sa.ForeignKey("userProperties.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "transferId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("equityTransfers.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "userPropertyId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("userProperties.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("claimedPercent", sa.Numeric(5, 2), nullable=False),
         sa.Column("claimedAt", sa.DateTime(timezone=True), nullable=False),
     )

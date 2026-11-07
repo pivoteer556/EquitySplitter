@@ -12,7 +12,10 @@ class RateLimitHit(Base):
     """One counted attempt. `key` is a SHA-256 of the caller's key, so no email/IP is stored."""
 
     __tablename__ = "rateLimitHits"
-    __table_args__ = (Index("ix_rateLimitHits_key_expiresAt", "key", "expiresAt"), Index("ix_rateLimitHits_expiresAt", "expiresAt"))
+    __table_args__ = (
+        Index("ix_rateLimitHits_key_expiresAt", "key", "expiresAt"),
+        Index("ix_rateLimitHits_expiresAt", "expiresAt"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     key: Mapped[str] = mapped_column(String(64), nullable=False)

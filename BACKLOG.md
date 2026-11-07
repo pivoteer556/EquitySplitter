@@ -44,10 +44,8 @@ talk to the API without script.
 
 ## 6. Smaller items
 
-- Ruff line-length 200 -> 120: set it in `pyproject.toml` and rewrap the lines over 120.
 - Complexity guardrails (ruff, no new dependency): enable `C901` (mccabe, max-complexity 8) and `PLR0911`/`PLR0912`/`PLR0913`/`PLR0915` (returns, branches, args, statements) in `pyproject.toml`. Measured 2026-11-07: zero findings today, so this is a free ratchet. Test = a throwaway function over the limit fails `ruff check`. Function length by lines has no ruff rule (`PLR0915` counts statements); `lizard` could add NLOC if wanted.
 - Review the ~82 lines over 120 for structural causes (long query chains, deep nesting, fat route handlers) before rewrapping blindly. Complexity metrics show nothing wrong, so this is likely long strings/signatures, but it is unverified.
-- Set `postgres_location` default to `canadacentral` in `infra/variables.tf` (user runs `terraform plan`; expect no changes).
 - Resolve the `httpx` vs `httpx2` Starlette deprecation warning.
 - Bump Node 20 actions (`actions/checkout@v4`, `setup-python@v5`, `azure/login@v2`) if newer majors exist.
 - Dependabot and/or a scheduled pip-audit job (CI only audits at push time).
@@ -81,3 +79,5 @@ talk to the API without script.
 - `.gitattributes` forces LF for shell scripts (`*.sh text eol=lf`). Requirements-file CRLF warnings remain harmless.
 - `@app.on_event` replaced by a lifespan handler (no deprecation warning; startup verified against Postgres).
 - alembic `env.py` handles `%` in `DATABASE_URL`.
+- Ruff line length is 120 (82 lines rewrapped with `ruff format` on the affected files).
+- `postgres_location` defaults to canadacentral (user to confirm with `terraform plan`: expect no changes).

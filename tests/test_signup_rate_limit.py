@@ -14,7 +14,12 @@ def _register(client, i, headers=None):
 def _bootstrap(client, i, headers=None):
     return client.post(
         "/api/v1/auth/institution/bootstrap",
-        json={"institutionName": f"Inst {i}", "officerName": f"O{i}", "officerEmail": f"o{i}@example.com", "officerPassword": STRONG_PASSWORD},
+        json={
+            "institutionName": f"Inst {i}",
+            "officerName": f"O{i}",
+            "officerEmail": f"o{i}@example.com",
+            "officerPassword": STRONG_PASSWORD,
+        },
         headers=headers,
     )
 
@@ -58,12 +63,16 @@ def test_signup_budget_is_per_client_ip_behind_trusted_proxy(client, monkeypatch
 def test_signup_limit_does_not_affect_login_counters(client, officer):
     for i in range(MAX_SIGNUPS):
         _register(client, i)
-    resp = client.post("/api/v1/auth/institution/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD})
+    resp = client.post(
+        "/api/v1/auth/institution/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD}
+    )
     assert resp.status_code == 200
 
 
 def _accept(client, token="garbage", headers=None):
-    return client.post("/api/v1/auth/accept-invite", json={"token": token, "password": STRONG_PASSWORD}, headers=headers)
+    return client.post(
+        "/api/v1/auth/accept-invite", json={"token": token, "password": STRONG_PASSWORD}, headers=headers
+    )
 
 
 def test_accept_invite_is_limited_per_ip(client):

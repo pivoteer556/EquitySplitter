@@ -32,7 +32,11 @@ def _derive_secret(seed: str) -> str:
 def ensure_secret_state(db: Session) -> AuthSecretState:
     state = db.query(AuthSecretState).first()
     if state is None:
-        state = AuthSecretState(currentSecret=_derive_secret(f"{settings.jwt_secret_seed}:{secrets.token_hex(16)}"), previousSecret=None, rotatedAt=now_utc_seconds())
+        state = AuthSecretState(
+            currentSecret=_derive_secret(f"{settings.jwt_secret_seed}:{secrets.token_hex(16)}"),
+            previousSecret=None,
+            rotatedAt=now_utc_seconds(),
+        )
         db.add(state)
         db.commit()
         db.refresh(state)
@@ -64,7 +68,9 @@ def _verify_legacy_sha256(password: str, salt: str, password_hash: str) -> bool:
 
 def validate_password_policy(password: str) -> None:
     if not PASSWORD_POLICY.match(password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password does not meet policy requirements")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Password does not meet policy requirements"
+        )
 
 
 def issue_token(db: Session, subject_id: UUID, user_type: str, institution_id: UUID | None = None) -> str:
@@ -205,7 +211,9 @@ def bootstrap_institution(
 
 
 def ensure_user_property_scope(db: Session, user_id: UUID, property_id: UUID) -> None:
-    row = db.query(UserProperty.id).filter(UserProperty.userId == user_id, UserProperty.propertyId == property_id).first()
+    row = (
+        db.query(UserProperty.id).filter(UserProperty.userId == user_id, UserProperty.propertyId == property_id).first()
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not enrolled on this property")
 

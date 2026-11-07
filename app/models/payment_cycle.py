@@ -12,7 +12,9 @@ class PaymentCycle(Base):
     __tablename__ = "paymentCycles"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    userPropertyId: Mapped[uuid.UUID] = mapped_column("userPropertyId", UUID(as_uuid=True), ForeignKey("userProperties.id", ondelete="CASCADE"), nullable=False)
+    userPropertyId: Mapped[uuid.UUID] = mapped_column(
+        "userPropertyId", UUID(as_uuid=True), ForeignKey("userProperties.id", ondelete="CASCADE"), nullable=False
+    )
     dueDate: Mapped[date] = mapped_column("dueDate", Date, nullable=False)
     equityDue: Mapped[float] = mapped_column("equityDue", Numeric(12, 2), nullable=False)
     interestDue: Mapped[float] = mapped_column("interestDue", Numeric(12, 2), nullable=False)

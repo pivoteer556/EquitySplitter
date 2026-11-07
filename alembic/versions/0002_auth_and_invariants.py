@@ -30,9 +30,19 @@ def upgrade() -> None:
     op.create_table(
         "tokenRevocations",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("institutionUserId", postgresql.UUID(as_uuid=True), sa.ForeignKey("institutionUsers.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "institutionUserId",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("institutionUsers.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("revokedAt", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("revokedBy", postgresql.UUID(as_uuid=True), sa.ForeignKey("institutionUsers.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "revokedBy",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("institutionUsers.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
     op.create_index("ix_tokenRevocations_institutionUserId", "tokenRevocations", ["institutionUserId"])
 
@@ -45,7 +55,9 @@ def upgrade() -> None:
     )
 
     op.create_unique_constraint("uq_userProperties_user_property", "userProperties", ["userId", "propertyId"])
-    op.create_unique_constraint("uq_ownerAcks_agreement_userProperty", "ownerAcknowledgements", ["agreementId", "userPropertyId"])
+    op.create_unique_constraint(
+        "uq_ownerAcks_agreement_userProperty", "ownerAcknowledgements", ["agreementId", "userPropertyId"]
+    )
 
     op.execute(
         """

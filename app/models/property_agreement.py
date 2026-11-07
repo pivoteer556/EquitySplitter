@@ -12,7 +12,9 @@ class PropertyAgreement(Base):
     __tablename__ = "propertyAgreements"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    propertyId: Mapped[uuid.UUID] = mapped_column("propertyId", UUID(as_uuid=True), ForeignKey("properties.id", ondelete="CASCADE"), nullable=False, unique=True)
+    propertyId: Mapped[uuid.UUID] = mapped_column(
+        "propertyId", UUID(as_uuid=True), ForeignKey("properties.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
     noticeDays: Mapped[int] = mapped_column("noticeDays", Integer, nullable=False)
     valuationMethod: Mapped[str] = mapped_column("valuationMethod", String(50), nullable=False)
     partialClaimMethod: Mapped[str] = mapped_column("partialClaimMethod", String(50), nullable=False)

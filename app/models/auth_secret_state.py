@@ -14,4 +14,6 @@ class AuthSecretState(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     currentSecret: Mapped[str] = mapped_column("currentSecret", String(512), nullable=False)
     previousSecret: Mapped[str | None] = mapped_column("previousSecret", String(512), nullable=True)
-    rotatedAt: Mapped[datetime] = mapped_column("rotatedAt", DateTime(timezone=True), nullable=False, server_default=func.now())
+    rotatedAt: Mapped[datetime] = mapped_column(
+        "rotatedAt", DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

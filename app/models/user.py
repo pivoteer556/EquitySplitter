@@ -16,7 +16,11 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     passwordHash: Mapped[str | None] = mapped_column("passwordHash", String(255), nullable=True)
     passwordSalt: Mapped[str | None] = mapped_column("passwordSalt", String(64), nullable=True)
-    lastTokenIssuedAt: Mapped[datetime | None] = mapped_column("lastTokenIssuedAt", DateTime(timezone=True), nullable=True)
-    createdAt: Mapped[DateTime] = mapped_column("createdAt", DateTime(timezone=True), nullable=False, server_default=func.now())
+    lastTokenIssuedAt: Mapped[datetime | None] = mapped_column(
+        "lastTokenIssuedAt", DateTime(timezone=True), nullable=True
+    )
+    createdAt: Mapped[DateTime] = mapped_column(
+        "createdAt", DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     userProperties = relationship("UserProperty", back_populates="user", cascade="all, delete-orphan")

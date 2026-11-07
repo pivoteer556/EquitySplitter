@@ -12,7 +12,9 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    cycleId: Mapped[uuid.UUID] = mapped_column("cycleId", UUID(as_uuid=True), ForeignKey("paymentCycles.id", ondelete="CASCADE"), nullable=False)
+    cycleId: Mapped[uuid.UUID] = mapped_column(
+        "cycleId", UUID(as_uuid=True), ForeignKey("paymentCycles.id", ondelete="CASCADE"), nullable=False
+    )
     amountPaid: Mapped[float] = mapped_column("amountPaid", Numeric(12, 2), nullable=False)
     paidAt: Mapped[datetime | None] = mapped_column("paidAt", DateTime(timezone=True), nullable=True)
 
