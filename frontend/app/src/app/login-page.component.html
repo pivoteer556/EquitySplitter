@@ -18,13 +18,17 @@
 
   <section>
     <h2>Sign In</h2>
-    <input [(ngModel)]="loginEmail" placeholder="Institution email" />
-    <input [(ngModel)]="loginPassword" type="password" placeholder="Password" />
-    <button (click)="login()" [disabled]="loading">{{ loading ? 'Signing in...' : 'Login' }}</button>
+    <form (ngSubmit)="login()" ngNativeValidate>
+      <label for="login-email">Email</label>
+      <input id="login-email" name="email" type="email" autocomplete="username" required [(ngModel)]="loginEmail" />
+      <label for="login-password">Password</label>
+      <input id="login-password" name="password" type="password" autocomplete="current-password" required [(ngModel)]="loginPassword" />
+      <button type="submit" [disabled]="loading">{{ loading ? 'Signing in...' : 'Login' }}</button>
+    </form>
   </section>
 
   @if (error) {
-    <pre class="error">{{ error }}</pre>
+    <pre class="error" role="alert">{{ error }}</pre>
   }
 
   @if (lastResponse) {

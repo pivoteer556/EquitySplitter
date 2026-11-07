@@ -24,3 +24,12 @@ input {
   padding: 10px;
   border-radius: 6px;
 }
+
+label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+form input:user-invalid {
+  border: 1px solid #b91c1c;
+}
