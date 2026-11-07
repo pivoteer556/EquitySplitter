@@ -67,9 +67,9 @@ variable "location" {
 }
 
 variable "postgres_location" {
-  description = "Region for the PostgreSQL server only; null means use var.location. Set it when the server size is not offered to this subscription in var.location."
+  description = "Region for the PostgreSQL server only; defaults to canadacentral, where the server size is offered to this subscription (eastus2 failed). Set it to null to use var.location instead."
   type        = string
-  default     = null
+  default     = "canadacentral"
 }
 
 variable "postgres_server_name" {
