@@ -44,6 +44,8 @@ talk to the API without script.
 
 ## 6. Smaller items
 
+- Ruff line-length 200 -> 120: set it in `pyproject.toml` and rewrap the lines over 120.
+- Set `postgres_location` default to `canadacentral` in `infra/variables.tf` (user runs `terraform plan`; expect no changes).
 - Resolve the `httpx` vs `httpx2` Starlette deprecation warning.
 - Bump Node 20 actions (`actions/checkout@v4`, `setup-python@v5`, `azure/login@v2`) if newer majors exist.
 - Dependabot and/or a scheduled pip-audit job (CI only audits at push time).
@@ -52,12 +54,15 @@ talk to the API without script.
 - Clean up the ghost `equitysplitter-pg` servers in eastus2.
 - Audit log, password reset, atomic rate limiter; accessibility checks; GitHub repo description/topics.
 
+## Decisions (user, 2026-11-07)
+
+- Ruff line length: shorten from 200; plan is 120 (82 lines to rewrap), revisit 88 later.
+- Postgres region: canadacentral (eastus2 failed). Make it the `postgres_location` default in `infra/variables.tf`.
+- Frontend errors: the more HTML-native scheme. Inline native validation (`:user-invalid`) plus a `role="alert"` region for server errors; `popover` toasts for confirmations; no library.
+
 ## Open decisions (user)
 
-- Ruff line length: 200 now, or lower?
-- Postgres region (presumed canadacentral).
 - Do the Terraform state-secrets work before or after the remaining deploy work (leaning after)?
-- Toast or inline for errors (leaning: inline for form errors, popover toast for confirmations).
 
 ## Not yet verified
 
