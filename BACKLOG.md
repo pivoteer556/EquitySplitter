@@ -34,7 +34,18 @@ Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Step
 4. Success feedback (toast via `popover`, no library) and a responsive layout.
 5. ~~Fix stale `src/app/app.spec.ts` ("Hello, app"), then run `ng test` in CI (the `frontend` job only built).~~ **Done** 63296ad (spec) and 494a9f4 (CI step; ran green on GitHub).
 6. Frontend calls accept-invite and shows `inviteToken`.
-7. End-to-end browser tests with Playwright, written adversarially (try to break sign-in: injection, double-submit, bad tokens, 4xx/5xx/offline). User chose Playwright option 1, 2026-11-07. Steps: (a) harness + adversarial sign-in suite against a faked API (IN PROGRESS); (b) run in CI with Chrome; (c) workbench flows; (d) run against the hosted site once step 5 of section 1 is done.
+7. End-to-end browser tests with Playwright, written adversarially (try to break sign-in: injection, double-submit, bad tokens, 4xx/5xx/offline). User chose Playwright option 1, 2026-11-07. Steps: (a) ~~harness + adversarial sign-in suite~~ **Done** (this commit): 37 Playwright tests, 3 stable runs by Melchior and 1 by me; hits a REAL local backend and throwaway Postgres (`equity_e2e`), with `page.route` only for labelled fault injection (the user chose real-backend UI tests, unit tests stay mocked); (b) run in CI with Chrome; (c) workbench flows; (d) run against the hosted site once step 5 of section 1 is done.
+
+## 2b. Findings from the adversarial e2e suite (2026-11-07)
+
+Each is pinned by a `test.fail()` test in `frontend/app/e2e/signin.spec.ts`; when fixed, remove `test.fail` and strike the item.
+
+1. **Account enumeration (medium, backend).** Unknown email -> 403 "Password reset required"; known email, wrong password -> 401 "Invalid credentials" (`app/api/routes/auth.py` login and institution_login). Same response for both, and keep the limiter counting.
+2. **Token stored before it is decoded (low-medium, frontend).** `ApiService.institutionLogin` stores the token in `tap`, then `extractInstitutionId` can throw; the garbage token stays in localStorage and /workbench admits it.
+3. **authGuard only checks non-empty (low, frontend).** Any string opens the /workbench shell; the API would still 401.
+4. **Logout leaves `institutionId` in localStorage (low, frontend).** `clearTokens()` does not clear it.
+5. Oddities: the password field keeps its value after a failed login; a 422 shows only the generic sentence, with no field-level message; the login page dumps the response JSON (token included) into a `<pre>` before navigating, which is fragile; 403/422 are not mapped by `friendlyError`.
+6. Design observation: the backend allows one active token per user, so a second device or tab signing in kills the first session (it also made parallel e2e workers flaky).
 
 ## 3. Deploy hardening
 
