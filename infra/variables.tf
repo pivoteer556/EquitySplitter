@@ -60,6 +60,12 @@ variable "location" {
   default     = "eastus2" # eastus is restricted for Postgres Flexible Server on this subscription
 }
 
+variable "postgres_location" {
+  description = "Region for the PostgreSQL server only; null means use var.location. Set it when the server size is not offered to this subscription in var.location."
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   description = "Tags applied to every resource."
   type        = map(string)
