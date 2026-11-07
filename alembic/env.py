@@ -8,7 +8,8 @@ from app.db.session import Base
 from app.models import *  # noqa: F403
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# ConfigParser treats % as interpolation syntax; escape it (it is unescaped on read).
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
