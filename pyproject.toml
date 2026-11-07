@@ -6,11 +6,15 @@ target-version = "py312"
 extend-exclude = ["frontend", "node_modules", ".venv", "venv"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP"]
+# Complexity guardrails: functions over mccabe 8 or pylint design limits (returns/branches/args/statements) fail lint.
+select = ["E", "F", "I", "B", "UP", "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI idiom: Depends() in a default argument is intentional (B008). Whitelist the call, not the rule.
 extend-immutable-calls = ["fastapi.Depends"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
 
 [tool.mypy]
 python_version = "3.12"
