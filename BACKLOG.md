@@ -104,6 +104,10 @@ Decisions still needed before building: (1) which property fields a buyer or oth
 
 **Loan/property split (user: buyers see non-loan information; the loan was not separate in this repo):** in order, expand then contract: (1) ~~additive `loans` table, backfill, dual-write~~ **Done** (this commit, migration 0006; old columns and all API bodies unchanged; DB-level cascade not covered by SQLite tests); (2) ~~switch reads to the loan~~ **Done** (this commit): all property responses take the four loan fields from the Loan row (legacy columns only as a fallback when no Loan row exists), same body shape, list uses `selectinload`; PATCH now dual-writes only the fields present in the payload (the step-1 version copied all four legacy values and would have clobbered the Loan); (3) public pending-listing endpoint with property-only fields; (4) drop the old loan columns from `properties`. Officer delete waits until after this split.
 
+Later (user, 2026-11-07): NMLS licensing info for loan officers/professionals, shown in the professionals directory.
+
+Listing fields agreed (user): a buyer sees non-loan information only. Step 3 builds `GET /listings` with exactly id, address, status, createdAt (IN PROGRESS).
+
 Then, one run each: a role vocabulary check; a public pending-listing endpoint with a restricted response schema (and tests that no private field leaks); a professionals directory; the ConnectionRequest model + migration + endpoints; UI for each.
 
 ## 3. Deploy hardening
