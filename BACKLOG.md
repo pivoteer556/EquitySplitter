@@ -94,7 +94,9 @@ User statement: officers should be able to look at any pending property; any pot
 - LO / UW / broker are `role` values on institution users (today a free-text `role`, default `loan_officer`).
 - A buyer sends a connection request to a professional about a property; the professional accepts or declines (new entity, e.g. `ConnectionRequest`: buyer, professional, property, status).
 
-Decisions needed before building: (1) which property fields a buyer or other-institution officer may see on a pending property (owners' names/emails and the agreement stay private; the seller's current balance and monthly payment are sensitive); (2) whether all three roles are institution users and whether buyers get a directory of professionals; (3) how a connection works (request/accept, officer assignment, or both).
+**Decided (user, one-word answer "Buyers", my reading):** buyers initiate connections (a buyer requests; the professional accepts or declines). If this reading is wrong, correct it here.
+
+Decisions still needed before building: (1) which property fields a buyer or other-institution officer may see on a pending property (owners' names/emails and the agreement stay private; the seller's current balance and monthly payment are sensitive); (2) whether all three roles are institution users and whether buyers get a directory of professionals; (3) ~~how a connection works~~ buyer-initiated request/accept (see above); can an officer also assign, or is it buyer-only?
 
 Then, one run each: a role vocabulary check; a public pending-listing endpoint with a restricted response schema (and tests that no private field leaks); a professionals directory; the ConnectionRequest model + migration + endpoints; UI for each.
 
