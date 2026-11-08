@@ -28,4 +28,5 @@ class Property(Base):
     agreement = relationship(
         "PropertyAgreement", back_populates="property", uselist=False, cascade="all, delete-orphan"
     )
-    userProperties = relationship("UserProperty", back_populates="property", cascade="all, delete-orphan")
+    loan = relationship("Loan", back_populates="property", uselist=False, cascade="all, delete-orphan")
+    userProperties =relationship("UserProperty", back_populates="property", cascade="all, delete-orphan")

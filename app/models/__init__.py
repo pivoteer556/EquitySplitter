@@ -3,6 +3,7 @@ from app.models.equity_ledger import EquityLedger
 from app.models.equity_transfer import EquityTransfer
 from app.models.institution import Institution
 from app.models.institution_user import InstitutionUser
+from app.models.loan import Loan
 from app.models.owner_acknowledgement import OwnerAcknowledgement
 from app.models.payment import Payment
 from app.models.payment_cycle import PaymentCycle
@@ -20,6 +21,7 @@ __all__ = [
     "User",
     "Property",
     "PropertyAgreement",
+    "Loan",
     "UserProperty",
     "OwnerAcknowledgement",
     "PaymentCycle",

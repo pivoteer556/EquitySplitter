@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.models import (
     Institution,
     InstitutionUser,
+    Loan,
     OwnerAcknowledgement,
     Property,
     PropertyAgreement,
@@ -72,6 +73,14 @@ def create_institution_user(
     return inst_user
 
 
+LOAN_FIELDS = ("loanAmount", "currentBalance", "monthlyPayment", "dynamicBillingEnabled")
+
+
+def _loan_from(prop: Property) -> Loan:
+    # Unset fields (dynamicBillingEnabled before the INSERT default) stay unset so Loan's own default applies.
+    return Loan(**{f: getattr(prop, f) for f in LOAN_FIELDS if getattr(prop, f) is not None})
+
+
 @router.post("/properties", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 def create_property(
     payload: PropertyCreate,
@@ -83,6 +92,7 @@ def create_property(
         raise HTTPException(status_code=403, detail="Loan officer not authorized for institution")
 
     prop = Property(**payload.model_dump(), status="pending_acknowledgement")
+    prop.loan = _loan_from(prop)  # dual-write: the loan table mirrors the property's loan columns
     db.add(prop)
     db.commit()
     db.refresh(prop)
@@ -291,6 +301,11 @@ def update_property(
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(prop, field, value)
+    if prop.loan is None:
+        prop.loan = _loan_from(prop)
+    else:
+        for field in LOAN_FIELDS:
+            setattr(prop.loan, field, getattr(prop, field))
     db.commit()
     db.refresh(prop)
     return prop

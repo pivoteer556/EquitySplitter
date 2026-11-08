@@ -102,6 +102,8 @@ User statement: officers should be able to look at any pending property; any pot
 
 Decisions still needed before building: (1) which property fields a buyer or other-institution officer may see on a pending property (owners' names/emails and the agreement stay private; the seller's current balance and monthly payment are sensitive); (2) whether all three roles are institution users and whether buyers get a directory of professionals; (3) ~~how a connection works~~ buyer-initiated request/accept (see above); can an officer also assign, or is it buyer-only?
 
+**Loan/property split (user: buyers see non-loan information; the loan was not separate in this repo):** in order, expand then contract: (1) ~~additive `loans` table, backfill, dual-write~~ **Done** (this commit, migration 0006; old columns and all API bodies unchanged; DB-level cascade not covered by SQLite tests); (2) switch reads and response shapes to the loan; (3) public pending-listing endpoint with property-only fields; (4) drop the old loan columns from `properties`. Officer delete waits until after this split.
+
 Then, one run each: a role vocabulary check; a public pending-listing endpoint with a restricted response schema (and tests that no private field leaks); a professionals directory; the ConnectionRequest model + migration + endpoints; UI for each.
 
 ## 3. Deploy hardening
