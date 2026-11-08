@@ -84,7 +84,7 @@ Progress and rules (user answer 2026-11-07: a property is removed only when an o
 - Officer update of a property, its agreement and its owners: only while `pending_acknowledgement` (matches the existing lock once active).
 - Officer delete: only while never activated; hard delete is acceptable then.
 - Owner split of an ACTIVE property: needs all owners' consent, ends in a `dissolved` status and keeps history. **Blocked on the user:** what a split means for the loan (end co-ownership only, or separate properties/loans).
-- Gap found: `GET /properties/{id}` and `/owners` accept user tokens only; officers cannot read a single property. Add the dual dependency plus an institution check.
+- ~~Gap found: `GET /properties/{id}` and `/owners` accept user tokens only; officers cannot read a single property. Add the dual dependency plus an institution check.~~ **Done** (this commit): officers read their own institution's property and owners list; another institution's property returns 404, identical to a nonexistent id. Minor leftover: an UNLINKED OWNER still gets 403 (not 404) for an existing property, so owners can probe for existing ids (UUIDs, low risk); the existing test pins that 403.
 
 ## 3. Deploy hardening
 

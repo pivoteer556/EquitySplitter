@@ -249,17 +249,27 @@ def list_properties(
     return query.limit(limit).offset(offset).all()
 
 
+def _readable_property(db: Session, principal: Principal, property_id: str) -> Property:
+    prop = db.query(Property).filter(Property.id == UUID(property_id)).first()
+    if principal.user_type == "institution_user":
+        # Another institution's property is indistinguishable from a missing one (no existence leak).
+        if prop is None or prop.institutionId != principal.institution_id:
+            raise HTTPException(status_code=404, detail="Property not found")
+        return prop
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+    require_user_property_scope(prop.id, principal, db)
+    return prop
+
+
 @router.get("/properties/{propertyId}", response_model=PropertyDetailRead)
 def get_property(
     propertyId: str,
     response: Response,
-    principal: Principal = Depends(require_user),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
-    if prop is None:
-        raise HTTPException(status_code=404, detail="Property not found")
-    require_user_property_scope(prop.id, principal, db)
+    prop = _readable_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     return {
@@ -274,13 +284,10 @@ def get_property(
 def list_owners(
     propertyId: str,
     response: Response,
-    principal: Principal = Depends(require_user),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
-    if prop is None:
-        raise HTTPException(status_code=404, detail="Property not found")
-    require_user_property_scope(prop.id, principal, db)
+    prop = _readable_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     if agreement is None:
