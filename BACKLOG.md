@@ -151,6 +151,10 @@ Steps, one commit each, docs/specs and this file updated each time:
 5. Later: photos and blob storage (Azure Blob; needs infra and the user's apply; not started).
 6. Optional, separate: rename the existing snake_case role values (`loan_officer`, `underwriter`, `broker`) to camelCase (`loanOfficer`, ...). Touches code, tests, docs and needs a data migration for live rows; the user decides whether it is worth it.
 
+## 2i. Ability-to-repay checklist on the loan (user decision 2026-11-08)
+
+Decision: the CFPB's eight ability-to-repay factors (12 CFR 1026.43(c)) become a per-loan checklist an underwriter marks off. They are criteria, not stages, so this is separate from the sale and underwriting status tracks in 2h. Planned shape (not built): a `loanChecklistItems` table (loanId, factor key, status such as notStarted / verified / failed / waived, note, who/when) with the eight factor keys defined in one place: income or assets, employment, payment on this loan, payment on simultaneous loans, mortgage-related obligations, other debts / alimony / child support, debt-to-income or residual income, credit history. Authorization: underwriters and officers of the loan's institution write it; buyers never see loan information (user rule). Open: who counts as "underwriter" for write access (role `underwriter` exists in the professional vocabulary), whether FHA and conventional need extra items (loan type is not recorded on `loans` yet), and verify the current eCFR text before shipping. Steps, one commit each with docs/specs updated: table + migration + model; endpoints; UI.
+
 ## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).
