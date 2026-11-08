@@ -16,7 +16,7 @@ export class LoginPageComponent {
   institutionName = 'Atlas Lending';
   officerName = 'Casey Officer';
   officerEmail = 'casey.officer@example.com';
-  officerPassword = '';
+  activationLink = '';
 
   loginEmail = '';
   loginPassword = '';
@@ -33,17 +33,17 @@ export class LoginPageComponent {
   bootstrapInstitution(): void {
     this.error = '';
     this.lastResponse = '';
+    this.activationLink = '';
     this.loading = true;
     this.api.bootstrapInstitution({
       institutionName: this.institutionName,
       officerName: this.officerName,
       officerEmail: this.officerEmail,
-      officerPassword: this.officerPassword,
     }).subscribe({
       next: (res) => {
-        this.lastResponse = JSON.stringify(res, null, 2);
+        // No session yet: the officer activates through this link and then signs in.
+        this.activationLink = window.location.origin + res.activationPath;
         this.loading = false;
-        this.router.navigateByUrl('/workbench');
       },
       error: (err) => {
         this.error = friendlyError(err);

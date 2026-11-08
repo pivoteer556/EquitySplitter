@@ -1,0 +1,25 @@
+<div class="activate-shell">
+  <h1>Activate your account</h1>
+
+  @if (hasToken) {
+    <form (submit)="$event.preventDefault(); activate(pw.value)">
+      <label for="activate-password">New password</label>
+      <input #pw id="activate-password" name="password" type="password" autocomplete="new-password" required
+        minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}"
+        title="At least 10 characters with a lowercase letter, an uppercase letter, a digit and a symbol."
+        aria-describedby="activate-hint"
+        (input)="cf.setCustomValidity(cf.value === pw.value ? '' : 'Passwords do not match')" />
+      <p id="activate-hint">At least 10 characters, with a lowercase letter, an uppercase letter, a digit and a symbol.</p>
+      <label for="activate-confirm">Confirm password</label>
+      <input #cf id="activate-confirm" name="confirm" type="password" autocomplete="new-password" required
+        (input)="cf.setCustomValidity(cf.value === pw.value ? '' : 'Passwords do not match')" />
+      <button type="submit" [disabled]="loading">{{ loading ? 'Saving...' : 'Activate' }}</button>
+    </form>
+  } @else {
+    <p class="error" role="alert">This activation link is missing its token. Open the full link you were given again.</p>
+  }
+
+  @if (error) {
+    <p class="error" role="alert">{{ error }}</p>
+  }
+</div>

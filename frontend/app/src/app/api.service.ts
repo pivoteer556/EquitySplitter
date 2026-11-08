@@ -9,7 +9,7 @@ import {
   AuthTokenResponse,
   Institution,
   InstitutionBootstrapResponse,
-  InstitutionUser,
+  InstitutionUserCreated,
   Listing,
   Property,
   PropertyAgreement,
@@ -33,12 +33,16 @@ export class ApiService {
     institutionName: string;
     officerName: string;
     officerEmail: string;
-    officerPassword: string;
   }): Observable<InstitutionBootstrapResponse> {
-    return this.http.post<InstitutionBootstrapResponse>(`${this.baseUrl}/auth/institution/bootstrap`, payload).pipe(
+    // No session comes back: the officer sets a password by opening the activation link.
+    return this.http.post<InstitutionBootstrapResponse>(`${this.baseUrl}/auth/institution/bootstrap`, payload);
+  }
+
+  activateInstitutionUser(token: string, password: string): Observable<AuthTokenResponse> {
+    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/institution/activate`, { token, password }).pipe(
       tap((res) => {
         this.setInstitutionToken(res.accessToken);
-        this.setInstitutionId(res.institution.id);
+        this.setInstitutionId(this.extractInstitutionId(res.accessToken));
       }),
     );
   }
@@ -120,9 +124,9 @@ export class ApiService {
       .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
   }
 
-  createInstitutionUser(payload: { institutionId: string; name: string; email: string; role: string; password: string }): Observable<InstitutionUser> {
+  createInstitutionUser(payload: { institutionId: string; name: string; email: string; role: string }): Observable<InstitutionUserCreated> {
     return this.http
-      .post<InstitutionUser>(`${this.baseUrl}/institution-users`, payload, { observe: 'response', headers: this.institutionHeaders() })
+      .post<InstitutionUserCreated>(`${this.baseUrl}/institution-users`, payload, { observe: 'response', headers: this.institutionHeaders() })
       .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
   }
 

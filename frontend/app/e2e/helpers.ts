@@ -1,5 +1,5 @@
 import { expect, Page, Request } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, API } from './global-setup';
+import { activate, ADMIN_EMAIL, ADMIN_PASSWORD, API } from './global-setup';
 
 export const LOGIN_API = '**/api/v1/auth/institution/login';
 export const GOOD_PASSWORD = 'Str0ng!Passw0rd#1';
@@ -40,11 +40,38 @@ async function createUser(tag: string): Promise<TestUser> {
       institutionId: process.env['E2E_INSTITUTION_ID'],
       name: `User ${tag}`,
       email,
-      password: GOOD_PASSWORD,
     }),
   });
   if (res.status !== 201) throw new Error(`makeUser failed: ${res.status} ${await res.text()}`);
+  const act = await activate((await res.json()).activationToken, GOOD_PASSWORD);
+  if (act.status !== 200) throw new Error(`makeUser activation failed: ${act.status} ${await act.text()}`);
   return { email, password: GOOD_PASSWORD };
+}
+
+/** Creates an officer but leaves them unactivated; returns the activation token for the /activate page tests. */
+export async function makePendingOfficer(tag: string): Promise<{ email: string; token: string }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const login = await fetch(`${API}/auth/institution/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
+      });
+      if (login.status !== 200) throw new Error(`admin login failed: ${login.status}`);
+      const { accessToken } = await login.json();
+      const email = `${tag}-${process.pid}-${Date.now()}-${counter++}@e2e.example.com`.toLowerCase();
+      const res = await fetch(`${API}/institution-users`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ institutionId: process.env['E2E_INSTITUTION_ID'], name: `User ${tag}`, email }),
+      });
+      if (res.status !== 201) throw new Error(`makePendingOfficer failed: ${res.status} ${await res.text()}`);
+      return { email, token: (await res.json()).activationToken };
+    } catch (e) {
+      if (attempt >= 8 || !String(e).includes('401')) throw e;
+      await new Promise((r) => setTimeout(r, 50 + Math.random() * 150));
+    }
+  }
 }
 
 /** Counts POSTs that actually leave the browser for the login endpoint. */

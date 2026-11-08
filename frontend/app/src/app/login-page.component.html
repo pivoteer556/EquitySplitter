@@ -10,10 +10,15 @@
     <input [(ngModel)]="institutionName" placeholder="Institution name" />
     <input [(ngModel)]="officerName" placeholder="Loan officer name" />
     <input [(ngModel)]="officerEmail" placeholder="Loan officer email" />
-    <input [(ngModel)]="officerPassword" type="password" placeholder="Loan officer password" />
     <button (click)="bootstrapInstitution()" [disabled]="loading">
       {{ loading ? 'Working...' : 'Bootstrap Institution' }}
     </button>
+    @if (activationLink) {
+      <div class="activation" role="status">
+        <p>Institution created. Give this one-time link to the loan officer so they can set a password:</p>
+        <p><a [href]="activationLink">{{ activationLink }}</a></p>
+      </div>
+    }
   </section>
 
   <section>

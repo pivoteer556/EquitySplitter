@@ -39,7 +39,9 @@ export default defineConfig({
       // database is recreated, migrated and the signup rate limit starts at zero on every run.
       command: `"${python}" frontend/app/e2e/reset-db.py && "${python}" -m alembic upgrade head && "${python}" -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
       cwd: repoRoot,
-      env: { DATABASE_URL: databaseUrl },
+      // TRUSTED_PROXY_HOPS=1 lets the e2e helpers claim distinct client IPs via X-Forwarded-For, so the per-IP
+      // activation limit (10/hour) does not throttle the many users the suite creates.
+      env: { DATABASE_URL: databaseUrl, TRUSTED_PROXY_HOPS: '1' },
       url: 'http://127.0.0.1:8000/health',
       reuseExistingServer: false,
       timeout: 120_000,

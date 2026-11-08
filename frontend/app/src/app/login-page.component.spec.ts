@@ -1,18 +1,23 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { ApiService } from './api.service';
 import { LoginPageComponent } from './login-page.component';
 
 describe('LoginPageComponent', () => {
-  function setup(err: unknown, calls: string[][] = []) {
+  function setup(err: unknown, calls: string[][] = [], bootstrapCalls: Record<string, string>[] = []) {
     const api = {
       institutionLogin: (email: string, password: string) => {
         calls.push([email, password]);
         return err === undefined ? of({}) : throwError(() => err);
       },
-      bootstrapInstitution: () => throwError(() => err),
+      bootstrapInstitution: (payload: Record<string, string>) => {
+        bootstrapCalls.push(payload);
+        return err === undefined
+          ? of({ institution: { id: 'i' }, institutionUser: {}, activationToken: 'tok', activationPath: '/activate#token=tok' })
+          : throwError(() => err);
+      },
     };
     TestBed.configureTestingModule({
       imports: [LoginPageComponent],
@@ -106,6 +111,27 @@ describe('LoginPageComponent', () => {
       fixture.componentInstance.error = 'boom';
       fixture.detectChanges();
       expect(root.querySelector('.error')?.getAttribute('role')).toBe('alert');
+    });
+  });
+
+  describe('bootstrap form', () => {
+    it('has no password input', () => {
+      const fixture = setup(undefined);
+      const section = (fixture.nativeElement as HTMLElement).querySelector('section') as HTMLElement;
+      expect(section.querySelector('input[type="password"]')).toBeNull();
+    });
+
+    it('sends no password, shows the full activation link and does not navigate', () => {
+      const bootstrapCalls: Record<string, string>[] = [];
+      const fixture = setup(undefined, [], bootstrapCalls);
+      const router = TestBed.inject(Router);
+      const nav = spyOn(router, 'navigateByUrl');
+      fixture.componentInstance.bootstrapInstitution();
+      fixture.detectChanges();
+      expect(Object.keys(bootstrapCalls[0]).sort()).toEqual(['institutionName', 'officerEmail', 'officerName']);
+      const link = (fixture.nativeElement as HTMLElement).querySelector('.activation a') as HTMLAnchorElement;
+      expect(link.textContent?.trim()).toBe(`${window.location.origin}/activate#token=tok`);
+      expect(nav).not.toHaveBeenCalled();
     });
   });
 

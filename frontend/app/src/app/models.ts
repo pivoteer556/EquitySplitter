@@ -65,10 +65,16 @@ export interface AuthTokenResponse {
 }
 
 export interface InstitutionBootstrapResponse {
-  accessToken: string;
-  tokenType: string;
   institution: Institution;
   institutionUser: InstitutionUser;
+  activationToken: string;
+  /** Relative link, '/activate#token=...'; prefix it with the site origin to hand it to the officer. */
+  activationPath: string;
+}
+
+export interface InstitutionUserCreated extends InstitutionUser {
+  activationToken: string;
+  activationPath: string;
 }
 
 export interface Listing {
