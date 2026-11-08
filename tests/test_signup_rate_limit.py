@@ -1,4 +1,4 @@
-from tests.conftest import STRONG_PASSWORD
+from tests.conftest import BOOTSTRAP_HEADERS, STRONG_PASSWORD
 
 MAX_SIGNUPS = 10
 
@@ -11,7 +11,7 @@ def _register(client, i, headers=None):
     )
 
 
-def _bootstrap(client, i, headers=None):
+def _bootstrap(client, i, headers=BOOTSTRAP_HEADERS):
     return client.post(
         "/api/v1/auth/institution/bootstrap",
         json={

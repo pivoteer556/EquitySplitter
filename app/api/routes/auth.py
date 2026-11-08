@@ -1,8 +1,9 @@
+import hmac
 from datetime import UTC, datetime
 from typing import NoReturn
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import Principal, require_institution_user
@@ -78,8 +79,19 @@ def _enforce_signup_limit(db: Session, request: Request, scope: str = "signup") 
 
 
 @router.post("/institution/bootstrap", response_model=InstitutionBootstrapResponse, status_code=status.HTTP_201_CREATED)
-def institution_bootstrap(payload: InstitutionBootstrapRequest, request: Request, db: Session = Depends(get_db)):
+def institution_bootstrap(
+    payload: InstitutionBootstrapRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    x_bootstrap_token: str | None = Header(default=None),
+):
+    # Limit first and record the attempt, so guessing the token is throttled like any other signup.
     _enforce_signup_limit(db, request)
+    expected = settings.bootstrap_token
+    # Missing, wrong and disabled (no token configured) are deliberately indistinguishable: same 404, same body.
+    # Bytes, because compare_digest rejects non-ASCII str.
+    if not expected or not hmac.compare_digest((x_bootstrap_token or "").encode(), expected.encode()):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     institution, officer, token = bootstrap_institution(
         db,
         payload.institutionName,

@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # Extra browser origins allowed by CORS, comma-separated (e.g. the deployed frontend URL).
     # http://localhost:4200 and http://127.0.0.1:4200 are always allowed.
     cors_allow_origins: str = ""
+    # Setup token required (header X-Bootstrap-Token) to create an institution via /auth/institution/bootstrap.
+    # Empty = the endpoint is disabled.
+    bootstrap_token: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

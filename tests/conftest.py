@@ -21,6 +21,8 @@ def _uuid_as_char_on_sqlite(type_, compiler, **kw):
 
 
 STRONG_PASSWORD = "ValidPass123!"
+BOOTSTRAP_TOKEN = "test-setup-token"
+BOOTSTRAP_HEADERS = {"X-Bootstrap-Token": BOOTSTRAP_TOKEN}
 
 
 def bearer(token: str) -> dict[str, str]:
@@ -38,6 +40,12 @@ def clock(monkeypatch):
     state = {"now": datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=60)}
     monkeypatch.setattr("app.services.auth.now_utc_seconds", lambda: state["now"])
     return state
+
+
+@pytest.fixture(autouse=True)
+def bootstrap_token(monkeypatch):
+    """Bootstrap is gated by a setup token; tests that send BOOTSTRAP_HEADERS get through, others are rejected."""
+    monkeypatch.setattr("app.api.routes.auth.settings.bootstrap_token", BOOTSTRAP_TOKEN)
 
 
 @pytest.fixture()
@@ -72,6 +80,7 @@ def bootstrap_officer(client, institution_name, officer_name, officer_email):
     resp = client.post(
         "/api/v1/auth/institution/bootstrap",
         json={"institutionName": institution_name, "officerName": officer_name, "officerEmail": officer_email},
+        headers=BOOTSTRAP_HEADERS,
     )
     assert resp.status_code == 201, resp.text
     body = resp.json()

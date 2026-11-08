@@ -40,6 +40,11 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
 - **CORS** — `http://localhost:4200` and `http://127.0.0.1:4200` are always allowed. Set `CORS_ALLOW_ORIGINS` to a
   comma-separated list of extra origins (e.g. `https://site.example.net,https://other.example`) to allow a deployed
   frontend. Whitespace, empty entries, trailing slashes and `*` are ignored.
+- **Bootstrap setup token** — `POST /auth/institution/bootstrap` (creating an institution) requires the header
+  `X-Bootstrap-Token` to equal the `BOOTSTRAP_TOKEN` setting (constant-time compare). Leave `BOOTSTRAP_TOKEN` empty to
+  disable the endpoint. A missing token, a wrong one and a disabled endpoint all return the same `404 Not found`, so
+  the endpoint is not discoverable and a response never says which case it was; every attempt counts against the
+  signup rate limit. Not yet wired into the Azure deployment or the frontend form (planned, BACKLOG 2g steps 2-3).
 - Invited owners start without a password. When the invitee has none, `POST /properties/{id}/owners` returns an
   `inviteToken` (re-inviting issues a fresh one); the loan officer hands it over out-of-band and the invitee POSTs
   `{token, password}` to `/auth/accept-invite` to set a password and get an access token. Tokens expire after 7 days
