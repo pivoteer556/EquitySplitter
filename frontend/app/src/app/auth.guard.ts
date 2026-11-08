@@ -10,3 +10,10 @@ export const authGuard: CanActivateFn = () => {
   }
   return router.createUrlTree(['/login']);
 };
+
+/** Officer-only pages: admits an institution token, not a buyer's user token. */
+export const officerGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const ok = (localStorage.getItem('institutionToken') ?? '').trim().length > 0;
+  return ok ? true : router.createUrlTree(['/login']);
+};

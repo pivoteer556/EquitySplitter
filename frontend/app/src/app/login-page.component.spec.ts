@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { ApiService } from './api.service';
@@ -18,7 +18,7 @@ describe('LoginPageComponent', () => {
       imports: [LoginPageComponent],
       providers: [
         { provide: ApiService, useValue: api },
-        { provide: Router, useValue: { navigateByUrl: () => Promise.resolve(true) } },
+        provideRouter([]),
       ],
     });
     const fixture = TestBed.createComponent(LoginPageComponent);
@@ -107,5 +107,10 @@ describe('LoginPageComponent', () => {
       fixture.detectChanges();
       expect(root.querySelector('.error')?.getAttribute('role')).toBe('alert');
     });
+  });
+
+  it('links to the buyer page', () => {
+    const fixture = setup(undefined);
+    expect(fixture.nativeElement.querySelector('a[href="/buyer"]')?.textContent).toContain('Sign in as a buyer');
   });
 });
