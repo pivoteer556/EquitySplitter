@@ -14,7 +14,9 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
-    passwordHash: Mapped[str | None] = mapped_column("passwordHash", String(255), nullable=True)
+    passwordHash: Mapped[str] = mapped_column("passwordHash", String(255), nullable=False)
+    # NULL while invited and the password is not yet chosen (passwordHash then holds an unusable hash).
+    passwordSetAt: Mapped[datetime | None] = mapped_column("passwordSetAt", DateTime(timezone=True), nullable=True)
     passwordSalt: Mapped[str | None] = mapped_column("passwordSalt", String(64), nullable=True)
     lastTokenIssuedAt: Mapped[datetime | None] = mapped_column(
         "lastTokenIssuedAt", DateTime(timezone=True), nullable=True

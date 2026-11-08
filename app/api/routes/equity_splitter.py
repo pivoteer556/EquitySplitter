@@ -26,7 +26,7 @@ from app.schemas.owner_acknowledgement import (
 from app.schemas.property import PropertyCreate, PropertyRead
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
-from app.services.auth import hash_password, issue_invite_token, validate_password_policy
+from app.services.auth import hash_password, issue_invite_token, unusable_password_hash, validate_password_policy
 
 router = APIRouter()
 
@@ -115,7 +115,7 @@ def attach_agreement(
 def _with_invite_token(db: Session, user: User, ack: OwnerAcknowledgement) -> OwnerInviteRead:
     # Only passwordless invitees need a token to set their password; re-invites re-issue a fresh one.
     result = OwnerInviteRead.model_validate(ack)
-    if user.passwordHash is None:
+    if user.passwordSetAt is None:
         result.inviteToken = issue_invite_token(db, user.id)
     return result
 
@@ -142,7 +142,7 @@ def invite_owner(
 
     user = db.query(User).filter(User.email == payload.email).first()
     if user is None:
-        user = User(name=payload.name, email=payload.email)
+        user = User(name=payload.name, email=payload.email, passwordHash=unusable_password_hash())
         db.add(user)
         db.flush()
 

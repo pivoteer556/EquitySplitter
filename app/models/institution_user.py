@@ -17,7 +17,7 @@ class InstitutionUser(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
-    passwordHash: Mapped[str | None] = mapped_column("passwordHash", String(255), nullable=True)
+    passwordHash: Mapped[str] = mapped_column("passwordHash", String(255), nullable=False)
     passwordSalt: Mapped[str | None] = mapped_column("passwordSalt", String(64), nullable=True)
     lastTokenIssuedAt: Mapped[datetime | None] = mapped_column(
         "lastTokenIssuedAt", DateTime(timezone=True), nullable=True

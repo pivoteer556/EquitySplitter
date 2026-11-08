@@ -133,7 +133,7 @@ def test_weak_password_is_rejected_and_token_stays_usable(client, officer, sessi
     _, token = _invited(client, officer)
     assert _accept(client, token, "weak").status_code == 400
     db = session_factory()
-    assert db.query(User).filter(User.email == "owner@example.com").one().passwordHash is None
+    assert db.query(User).filter(User.email == "owner@example.com").one().passwordSetAt is None
     db.close()
     assert _accept(client, token).status_code == 200
 

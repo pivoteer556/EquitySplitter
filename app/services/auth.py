@@ -61,6 +61,11 @@ def hash_password(password: str) -> str:
     return _hasher.hash(password)
 
 
+def unusable_password_hash() -> str:
+    """A valid argon2 hash of a random secret that is discarded: no password can ever verify against it."""
+    return _hasher.hash(secrets.token_urlsafe(32))
+
+
 _DUMMY_HASH = _hasher.hash("dummy-password-for-constant-time-login")
 
 
@@ -101,7 +106,7 @@ def issue_token(db: Session, subject_id: UUID, user_type: str, institution_id: U
 def issue_invite_token(db: Session, user_id: UUID) -> str:
     """Signed, stateless invite token (no DB row, no lastTokenIssuedAt). userType="invite" keeps it out of every
     auth dependency, which only accept "user"/"institution_user". Single-use is enforced by accept_invite
-    (passwordHash must still be unset)."""
+    (passwordSetAt must still be unset)."""
     iat_dt = now_utc_seconds()
     claims = {
         "sub": str(user_id),
@@ -173,10 +178,11 @@ def accept_invite(db: Session, token: str, password: str) -> tuple[User, str]:
         user = db.get(User, UUID(claims["sub"]))
     except (KeyError, ValueError):
         user = None
-    if user is None or user.passwordHash is not None:
+    if user is None or user.passwordSetAt is not None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired invite")
     validate_password_policy(password)
     user.passwordHash = hash_password(password)
+    user.passwordSetAt = now_utc_seconds()
     return user, refresh_and_store_user_token(db, user)  # commits the hash and the session iat together
 
 

@@ -1,7 +1,7 @@
 import hashlib
 
 from app.models import User
-from app.services.auth import hash_password, verify_and_upgrade_password
+from app.services.auth import hash_password, unusable_password_hash, verify_and_upgrade_password
 
 
 def _legacy_user(db, password: str) -> User:
@@ -46,9 +46,9 @@ def test_legacy_hash_wrong_password_is_not_upgraded(session_factory):
     db.close()
 
 
-def test_missing_hash_never_verifies(session_factory):
+def test_unusable_hash_never_verifies(session_factory):
     db = session_factory()
-    user = User(name="Invited", email="invited@example.com")
+    user = User(name="Invited", email="invited@example.com", passwordHash=unusable_password_hash())
     db.add(user)
     db.commit()
     assert verify_and_upgrade_password(db, user, "anything") is False

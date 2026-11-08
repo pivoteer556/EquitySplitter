@@ -24,6 +24,7 @@ from app.services.auth import (
     bootstrap_institution,
     burn_password_check,
     hash_password,
+    now_utc_seconds,
     refresh_and_store_institution_token,
     refresh_and_store_user_token,
     validate_password_policy,
@@ -100,7 +101,12 @@ def register(payload: AuthRegisterRequest, request: Request, db: Session = Depen
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    user = User(name=payload.name, email=payload.email, passwordHash=hash_password(payload.password))
+    user = User(
+        name=payload.name,
+        email=payload.email,
+        passwordHash=hash_password(payload.password),
+        passwordSetAt=now_utc_seconds(),
+    )
     db.add(user)
     db.flush()
     token = refresh_and_store_user_token(db, user)

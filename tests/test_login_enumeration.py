@@ -1,6 +1,7 @@
 import pytest
 
 from app.models import InstitutionUser, User
+from app.services.auth import unusable_password_hash
 from tests.conftest import STRONG_PASSWORD
 
 USER_URL = "/api/v1/auth/login"
@@ -10,16 +11,16 @@ MAX_FAILURES = 5
 
 @pytest.fixture()
 def accounts(client, officer, session_factory):
-    """A registered user and the bootstrapped officer, each with a NULL-hash twin."""
+    """A registered user and the bootstrapped officer, each with a unusable-hash twin."""
     client.post("/api/v1/auth/register", json={"name": "Sam", "email": "sam@example.com", "password": STRONG_PASSWORD})
     db = session_factory()
-    db.add(User(name="Nohash", email="nohash@example.com", passwordHash=None))
+    db.add(User(name="Nohash", email="nohash@example.com", passwordHash=unusable_password_hash()))
     db.add(
         InstitutionUser(
             institutionId=db.query(InstitutionUser).one().institutionId,
             name="Nohash",
             email="nohash-officer@example.com",
-            passwordHash=None,
+            passwordHash=unusable_password_hash(),
         )
     )
     db.commit()

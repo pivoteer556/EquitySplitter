@@ -54,7 +54,7 @@ Each is pinned by a `test.fail()` test in `frontend/app/e2e/signin.spec.ts`; whe
 The user wants every account to have a password and invites delivered by an emailed link. Steps, in order, one commit each:
 
 1. Frontend accept-invite page: reads the token from the link fragment (`#token=...`, never sent to servers or logs), sets the password via the existing accept-invite endpoint. First check the backend rejects reuse of an accepted token.
-2. Migration: backfill NULL `passwordHash` with an unusable random hash, then make the column NOT NULL; new invites store the same kind of hash. Includes the invite-flow tests.
+2. ~~Migration: backfill NULL `passwordHash` with an unusable random hash, then make the column NOT NULL; new invites store the same kind of hash. Includes the invite-flow tests.~~ **Done** (this commit, migration 0005): both `passwordHash` columns NOT NULL; `users.passwordSetAt IS NULL` marks "invited, not accepted" and `accept_invite` rejects reuse by that marker. **Not yet applied to the live database** (the next backend deploy runs `alembic upgrade head` via the entrypoint; the user must OK the push).
 3. Mail seam in the backend: `send_invite_email(to, link)` with a log/console backend for local use and tests. No provider yet.
 4. Real provider (user to choose; recommended Azure Communication Services Email with the Azure-managed domain; needs Terraform, the user's `apply`, a connection-string secret, a new dependency through the pip-audit gate). Not verified that Terraform covers it; check first.
 5. Wire sending into the invite flow and verify end to end with a real email to an address the user controls.
