@@ -7,6 +7,7 @@ import { ApiService } from './api.service';
 import { BuyerPageComponent } from './buyer-page.component';
 
 const GOOD = 'Str0ng!Passw0rd';
+import { expectPasswordRule } from './password-rule.testing';
 
 describe('BuyerPageComponent', () => {
   async function setup(opts: { loginErr?: unknown; registerErr?: unknown; pending?: boolean } = {}) {
@@ -48,6 +49,11 @@ describe('BuyerPageComponent', () => {
     const alertOf = (f: HTMLFormElement) => f.querySelector('[role="alert"]')?.textContent?.trim() ?? '';
     return { harness, root, signIn, create, fill, alertOf, loginCalls, registerCalls };
   }
+
+  it('advertises the password rule on the create-account password field', async () => {
+    const { create } = await setup();
+    expectPasswordRule(create.querySelector('input[name="password"]') as HTMLInputElement);
+  });
 
   it('links to the institution sign-in page', async () => {
     const { root } = await setup();

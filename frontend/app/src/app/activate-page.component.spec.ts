@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 
 import { ActivatePageComponent } from './activate-page.component';
 import { ApiService } from './api.service';
+import { expectPasswordRule } from './password-rule.testing';
 
 const TOKEN = 'header.payload.signature';
 const GOOD = 'Str0ng!Passw0rd';
@@ -67,6 +68,12 @@ describe('ActivatePageComponent', () => {
       expect(i.labels?.length).toBe(1);
     }
     expect(pw.minLength).toBe(10);
+  });
+
+  it('advertises the password rule to browsers and password managers', async () => {
+    const { f } = await setup(`/activate#token=${TOKEN}`);
+    expectPasswordRule(f!.querySelector('input[name="password"]') as HTMLInputElement);
+    expect((f!.querySelector('input[name="confirm"]') as HTMLInputElement).getAttribute('minlength')).toBe('10');
   });
 
   it('blocks submit natively for empty, short, non-compliant and mismatched passwords', async () => {

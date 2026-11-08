@@ -94,3 +94,26 @@ test('browser validation blocks a weak or mismatched password before any request
   await submit(page, GOOD_PASSWORD, GOOD_PASSWORD + 'x');
   expect(calls).toBe(0);
 });
+
+test('new-password input advertises the rule and the browser rejects weak values natively', async ({ page }) => {
+  const { token } = await makePendingOfficer('advert');
+  await open(page, token);
+  let calls = 0;
+  page.on('request', (r) => {
+    if (r.url().endsWith('/auth/institution/activate')) calls++;
+  });
+  const pw = page.locator('#activate-password');
+  await expect(pw).toHaveAttribute('autocomplete', 'new-password');
+  await expect(pw).toHaveAttribute('minlength', '10');
+  await expect(pw).toHaveAttribute('pattern', /\(\?=\.\*\[a-z\]\)/);
+  await expect(pw).toHaveAttribute('passwordrules', /minlength: 10; required: lower; required: upper; required: digit; required: special;/);
+  await expect(page.locator('#activate-confirm')).toHaveAttribute('autocomplete', 'new-password');
+  for (const weak of ['Short1!', 'nouppercase1!']) {
+    await pw.fill(weak);
+    expect(await pw.evaluate((i: HTMLInputElement) => i.validity.valid)).toBe(false);
+    await submit(page, weak);
+  }
+  await pw.fill(GOOD_PASSWORD);
+  expect(await pw.evaluate((i: HTMLInputElement) => i.validity.valid)).toBe(true);
+  expect(calls).toBe(0);
+});
