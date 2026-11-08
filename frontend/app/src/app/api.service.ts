@@ -63,6 +63,12 @@ export class ApiService {
     );
   }
 
+  acceptInvite(token: string, password: string): Observable<AuthTokenResponse> {
+    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/accept-invite`, { token, password }).pipe(
+      tap((res) => this.setUserToken(res.accessToken)),
+    );
+  }
+
   setInstitutionToken(token: string): void {
     this.institutionToken = token;
     if (token) {

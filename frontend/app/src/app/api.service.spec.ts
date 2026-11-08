@@ -18,6 +18,22 @@ describe('ApiService base URL', () => {
     http.verify();
   });
 
+  it('posts accept-invite with token and password and stores the user token', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ApiService);
+    const http = TestBed.inject(HttpTestingController);
+
+    api.acceptInvite('tok', 'Str0ng!Passw0rd').subscribe();
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/auth/accept-invite`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ token: 'tok', password: 'Str0ng!Passw0rd' });
+    req.flush({ accessToken: 'user-jwt' });
+    expect(api.getUserToken()).toBe('user-jwt');
+    api.clearTokens();
+    http.verify();
+  });
+
   it('defaults to the local API', () => {
     expect(environment.apiBaseUrl).toBe('http://127.0.0.1:8000/api/v1');
   });
