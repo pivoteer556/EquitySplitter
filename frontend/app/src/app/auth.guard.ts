@@ -3,8 +3,9 @@ import { inject } from '@angular/core';
 
 export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
-  const token = localStorage.getItem('institutionToken');
-  if (token && token.trim().length > 0) {
+  // A signed-in officer (institution token) or buyer/owner (user token) may pass.
+  const hasToken = ['institutionToken', 'userToken'].some((k) => (localStorage.getItem(k) ?? '').trim().length > 0);
+  if (hasToken) {
     return true;
   }
   return router.createUrlTree(['/login']);

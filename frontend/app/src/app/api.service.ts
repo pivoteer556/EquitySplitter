@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable, tap } from 'rxjs';
 
@@ -10,6 +10,7 @@ import {
   Institution,
   InstitutionBootstrapResponse,
   InstitutionUser,
+  Listing,
   Property,
   PropertyAgreement,
   PropertyDetailResponse,
@@ -187,6 +188,15 @@ export class ApiService {
         headers: this.institutionHeaders(),
       })
       .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+  }
+
+  /** Marketplace view; any signed-in buyer or officer may read it, so send whichever token is present. */
+  getListings(limit: number, offset: number): Observable<Listing[]> {
+    const token = this.userToken || this.institutionToken;
+    return this.http.get<Listing[]>(`${this.baseUrl}/listings`, {
+      params: new HttpParams().set('limit', limit).set('offset', offset),
+      headers: new HttpHeaders({ Authorization: `Bearer ${token}` }),
+    });
   }
 
   private institutionHeaders(): HttpHeaders {

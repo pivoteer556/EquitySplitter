@@ -70,3 +70,10 @@ export interface InstitutionBootstrapResponse {
   institution: Institution;
   institutionUser: InstitutionUser;
 }
+
+export interface Listing {
+  id: string;
+  address: string;
+  status: string;
+  createdAt: string;
+}
