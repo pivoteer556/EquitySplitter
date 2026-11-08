@@ -50,7 +50,7 @@ test.describe('client-side validation cannot be skipped by typing nothing useful
 
   test('bypassing browser validation: real 422 is shown as a plain sentence, not raw JSON', async ({ page }) => {
     // Client validation is advisory. Disable it and send an email the real server rejects (422, list detail).
-    await page.locator('form').evaluate((f: HTMLFormElement) => (f.noValidate = true));
+    await page.locator('#signin-form').evaluate((f: HTMLFormElement) => (f.noValidate = true));
     await fill(page, 'no-at-sign', 'whatever');
     const resp = page.waitForResponse(LOGIN_API);
     await loginButton(page).click();
@@ -192,7 +192,7 @@ test.describe('real backend responses', () => {
   });
 
   test('injection strings as credentials are inert', async ({ page }) => {
-    await page.locator('form').evaluate((f: HTMLFormElement) => (f.noValidate = true));
+    await page.locator('#signin-form').evaluate((f: HTMLFormElement) => (f.noValidate = true));
     await fill(page, `"'><img src=x onerror=window.__pwned=1>@e2e.example.com`, `' OR '1'='1`);
     const r = page.waitForResponse(LOGIN_API);
     await loginButton(page).click();

@@ -33,9 +33,12 @@ export class ApiService {
     institutionName: string;
     officerName: string;
     officerEmail: string;
-  }): Observable<InstitutionBootstrapResponse> {
+  }, setupToken: string): Observable<InstitutionBootstrapResponse> {
     // No session comes back: the officer sets a password by opening the activation link.
-    return this.http.post<InstitutionBootstrapResponse>(`${this.baseUrl}/auth/institution/bootstrap`, payload);
+    // The server's BOOTSTRAP_TOKEN gate: sent per request, never stored.
+    return this.http.post<InstitutionBootstrapResponse>(`${this.baseUrl}/auth/institution/bootstrap`, payload, {
+      headers: { 'X-Bootstrap-Token': setupToken },
+    });
   }
 
   activateInstitutionUser(token: string, password: string): Observable<AuthTokenResponse> {

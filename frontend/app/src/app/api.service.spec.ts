@@ -40,9 +40,10 @@ describe('ApiService base URL', () => {
     const http = TestBed.inject(HttpTestingController);
     api.clearTokens();
 
-    api.bootstrapInstitution({ institutionName: 'I', officerName: 'O', officerEmail: 'o@e.com' }).subscribe();
+    api.bootstrapInstitution({ institutionName: 'I', officerName: 'O', officerEmail: 'o@e.com' }, 'setup-tok').subscribe();
 
     const req = http.expectOne(`${environment.apiBaseUrl}/auth/institution/bootstrap`);
+    expect(req.request.headers.get('X-Bootstrap-Token')).toBe('setup-tok');
     expect(req.request.body).toEqual({ institutionName: 'I', officerName: 'O', officerEmail: 'o@e.com' });
     req.flush({ institution: { id: 'i1' }, institutionUser: {}, activationToken: 't', activationPath: '/activate#token=t' });
     expect(api.getInstitutionToken()).toBe('');

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from '@playwright/test';
+import { BOOTSTRAP_TOKEN } from './e2e/constants';
 
 // Browser: an already-installed one (no Playwright browser download). Locally Microsoft Edge ('msedge');
 // CI can set E2E_BROWSER_CHANNEL=chrome, or E2E_BROWSER_PATH=<executable>.
@@ -25,6 +26,8 @@ export default defineConfig({
   // Every login runs a deliberately slow password hash on one shared backend; many workers starve each other
   // (load-dependent timeouts in earlier runs). Two keeps the suite fast enough and stable.
   workers: 2,
+  // Password hashing is deliberately slow; under load an alert can take longer than the 5 s default to appear.
+  expect: { timeout: 10_000 },
   forbidOnly: !!process.env['CI'],
   retries: 0,
   reporter: [['list']],
@@ -42,7 +45,7 @@ export default defineConfig({
       cwd: repoRoot,
       // TRUSTED_PROXY_HOPS=1 lets the e2e helpers claim distinct client IPs via X-Forwarded-For, so the per-IP
       // activation limit (10/hour) does not throttle the many users the suite creates.
-      env: { DATABASE_URL: databaseUrl, TRUSTED_PROXY_HOPS: '1' },
+      env: { DATABASE_URL: databaseUrl, TRUSTED_PROXY_HOPS: '1', BOOTSTRAP_TOKEN },
       url: 'http://127.0.0.1:8000/health',
       reuseExistingServer: false,
       timeout: 120_000,

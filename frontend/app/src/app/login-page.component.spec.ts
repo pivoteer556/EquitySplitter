@@ -55,7 +55,7 @@ describe('LoginPageComponent', () => {
       const fixture = setup(undefined, calls);
       const root = fixture.nativeElement as HTMLElement;
       await fixture.whenStable(); // ngModel registers its controls in a microtask
-      const f = root.querySelector('form') as HTMLFormElement;
+      const f = root.querySelector('#signin-form') as HTMLFormElement;
       const fill = (name: string, value: string) => {
         const i = f.querySelector(`input[name="${name}"]`) as HTMLInputElement;
         i.value = value;
@@ -115,23 +115,77 @@ describe('LoginPageComponent', () => {
   });
 
   describe('bootstrap form', () => {
-    it('has no password input', () => {
-      const fixture = setup(undefined);
-      const section = (fixture.nativeElement as HTMLElement).querySelector('section') as HTMLElement;
-      expect(section.querySelector('input[type="password"]')).toBeNull();
+    async function bform(err: unknown = undefined, bootstrapCalls: Record<string, string>[] = []) {
+      const fixture = setup(err, [], bootstrapCalls);
+      await fixture.whenStable(); // ngModel registers its controls in a microtask
+      const f = (fixture.nativeElement as HTMLElement).querySelector('#bootstrap-form') as HTMLFormElement;
+      const token = f.querySelector('input[name="setupToken"]') as HTMLInputElement;
+      const type = (v: string) => {
+        token.value = v;
+        token.dispatchEvent(new Event('input'));
+        fixture.detectChanges(); // like a real keystroke: change detection sees the typed value before it is cleared
+      };
+      return { fixture, f, token, type };
+    }
+
+    it('has a labelled, required, non-autocompleting password-type setup token input and no officer password', async () => {
+      const { f, token } = await bform();
+      expect(token.type).toBe('password');
+      expect(token.required).toBe(true);
+      expect(token.getAttribute('autocomplete')).toBe('off');
+      expect(f.querySelector(`label[for="${token.id}"]`)?.textContent?.trim()).toBe('Setup token');
+      expect(f.querySelectorAll('input[type="password"]').length).toBe(1);
     });
 
-    it('sends no password, shows the full activation link and does not navigate', () => {
+    it('sends the setup token separately from the payload, shows the full activation link, clears the token and does not navigate', async () => {
       const bootstrapCalls: Record<string, string>[] = [];
-      const fixture = setup(undefined, [], bootstrapCalls);
+      const { fixture, type, token } = await bform(undefined, bootstrapCalls);
       const router = TestBed.inject(Router);
       const nav = spyOn(router, 'navigateByUrl');
+      type('s3cret');
       fixture.componentInstance.bootstrapInstitution();
       fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r)); // ngModel writes the cleared value to the DOM in a later microtask
       expect(Object.keys(bootstrapCalls[0]).sort()).toEqual(['institutionName', 'officerEmail', 'officerName']);
+      expect((bootstrapCalls[0] as unknown as { setupToken: string }).setupToken).toBeUndefined();
+      expect(bootstrapCalls.length).toBe(1);
       const link = (fixture.nativeElement as HTMLElement).querySelector('.activation a') as HTMLAnchorElement;
       expect(link.textContent?.trim()).toBe(`${window.location.origin}/activate#token=tok`);
       expect(nav).not.toHaveBeenCalled();
+      expect(fixture.componentInstance.setupToken).toBe('');
+      expect(token.value).toBe('');
+    });
+
+    it('passes the typed token to the api as the second argument', async () => {
+      const fixture = setup(undefined);
+      const api = TestBed.inject(ApiService) as unknown as { bootstrapInstitution: (p: unknown, t: string) => unknown };
+      const spy = spyOn(api, 'bootstrapInstitution').and.callThrough();
+      fixture.componentInstance.setupToken = 'abc';
+      fixture.componentInstance.bootstrapInstitution();
+      expect(spy.calls.mostRecent().args[1]).toBe('abc');
+    });
+
+    it('shows a clear generic message on 404, no activation link, and clears the token', async () => {
+      const { fixture, type, token } = await bform({ status: 404, error: { detail: 'Not found' } });
+      type('wrong');
+      fixture.componentInstance.bootstrapInstitution();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((r) => setTimeout(r)); // ngModel writes the cleared value to the DOM in a later microtask
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('.error')?.textContent?.trim()).toBe('Setup token not accepted.');
+      expect(root.querySelector('.activation')).toBeNull();
+      expect(fixture.componentInstance.setupToken).toBe('');
+      expect(token.value).toBe('');
+    });
+
+    it('does not store the token in localStorage or sessionStorage', async () => {
+      const { fixture, type } = await bform();
+      type('s3cret');
+      fixture.componentInstance.bootstrapInstitution();
+      const dump = JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage });
+      expect(dump).not.toContain('s3cret');
     });
   });
 

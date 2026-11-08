@@ -7,12 +7,16 @@
 
   <section>
     <h2>Bootstrap New Institution</h2>
-    <input [(ngModel)]="institutionName" placeholder="Institution name" />
-    <input [(ngModel)]="officerName" placeholder="Loan officer name" />
-    <input [(ngModel)]="officerEmail" placeholder="Loan officer email" />
-    <button (click)="bootstrapInstitution()" [disabled]="loading">
-      {{ loading ? 'Working...' : 'Bootstrap Institution' }}
-    </button>
+    <form id="bootstrap-form" (ngSubmit)="bootstrapInstitution()" ngNativeValidate>
+      <input name="institutionName" [(ngModel)]="institutionName" placeholder="Institution name" />
+      <input name="officerName" [(ngModel)]="officerName" placeholder="Loan officer name" />
+      <input name="officerEmail" [(ngModel)]="officerEmail" placeholder="Loan officer email" />
+      <label for="setup-token">Setup token</label>
+      <input id="setup-token" name="setupToken" type="password" autocomplete="off" required [(ngModel)]="setupToken" />
+      <button type="submit" [disabled]="loading">
+        {{ loading ? 'Working...' : 'Bootstrap Institution' }}
+      </button>
+    </form>
     @if (activationLink) {
       <div class="activation" role="status">
         <p>Institution created. Give this one-time link to the loan officer so they can set a password:</p>
@@ -23,7 +27,7 @@
 
   <section>
     <h2>Sign In</h2>
-    <form (ngSubmit)="login()" ngNativeValidate>
+    <form id="signin-form" (ngSubmit)="login()" ngNativeValidate>
       <label for="login-email">Email</label>
       <input id="login-email" name="email" type="email" autocomplete="username" required [(ngModel)]="loginEmail" />
       <label for="login-password">Password</label>
