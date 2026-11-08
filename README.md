@@ -146,6 +146,7 @@ Notes:
 - `POST /api/v1/properties/{propertyId}/owners`
 - `POST /api/v1/properties/{propertyId}/acknowledge`
 - `GET /api/v1/properties` (officer: own institution; owner: linked properties; `limit` 1-200 default 100, `offset`)
+- `GET /api/v1/professionals` (any buyer or officer: directory of institution users whose role is `loan_officer`, `underwriter` or `broker`, restricted to `id`, `name`, `role`, `institutionName`; no email or institution id; optional `role` filter, unknown role is 422; ordered by name then id; `limit` 1-200 default 100, `offset`)
 - `GET /api/v1/listings` (any owner/buyer or officer, any institution: pending properties only, restricted to `id`, `address`, `status`, `createdAt`; no loan, agreement or owner data; `limit` 1-200 default 100, `offset`)
 - `GET /api/v1/properties/{propertyId}`
 - `PATCH /api/v1/properties/{propertyId}` (officer of the property's institution, only while not active; partial update of address, loanAmount, currentBalance, monthlyPayment, dynamicBillingEnabled; unknown fields, nulls, empty body: 422)

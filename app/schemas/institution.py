@@ -1,7 +1,12 @@
 from datetime import datetime
+from typing import Literal, get_args
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
+
+# The one vocabulary of professional roles (validated on create, filtered on the directory).
+ProfessionalRole = Literal["loan_officer", "underwriter", "broker"]
+PROFESSIONAL_ROLES: tuple[str, ...] = get_args(ProfessionalRole)
 
 
 class InstitutionCreate(BaseModel):
@@ -21,7 +26,7 @@ class InstitutionUserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
-    role: str = "loan_officer"
+    role: ProfessionalRole = "loan_officer"
 
 
 class InstitutionUserRead(BaseModel):

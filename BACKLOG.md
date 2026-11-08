@@ -108,6 +108,8 @@ Later (user, 2026-11-07): NMLS licensing info for loan officers/professionals, s
 
 Listing fields agreed (user): a buyer sees non-loan information only. ~~Step 3 builds `GET /listings` with exactly id, address, status, createdAt.~~ **Done** (this commit): any buyer or officer, pending properties across institutions only; `ListingRead` response model is the leak guard; 6 tests incl. a raw-text leak check. ~~UI~~ listings page **Done** (next commit: `/listings`, semantic list, plain-language status, "Load more", empty/error states, `authGuard` now admits a buyer's user token as well as an officer's institution token, which also lets a user token through to `/workbench`; backend still enforces authorization; 12 new specs, 37 total). Still open: buyer sign-in/registration page (buyers cannot log in from the UI yet), workbench link to /listings, listing detail view, buyer connection requests, filtering/search, e2e for the listings page.
 
+~~Professionals directory~~ **Done** (this commit): `GET /professionals` (id, name, role, institutionName only), role vocabulary `loan_officer`/`underwriter`/`broker` enforced on `POST /institution-users`; existing rows with another role are simply not listed (no data migration, no DB check constraint yet).
+
 Then, one run each: a role vocabulary check; a public pending-listing endpoint with a restricted response schema (and tests that no private field leaks); a professionals directory; the ConnectionRequest model + migration + endpoints; UI for each.
 
 ## 3. Deploy hardening

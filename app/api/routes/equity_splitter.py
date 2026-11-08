@@ -22,7 +22,14 @@ from app.models import (
     User,
     UserProperty,
 )
-from app.schemas.institution import InstitutionCreate, InstitutionRead, InstitutionUserCreate, InstitutionUserRead
+from app.schemas.institution import (
+    PROFESSIONAL_ROLES,
+    InstitutionCreate,
+    InstitutionRead,
+    InstitutionUserCreate,
+    InstitutionUserRead,
+    ProfessionalRole,
+)
 from app.schemas.listing import ListingRead
 from app.schemas.owner_acknowledgement import (
     AcknowledgementRead,
@@ -31,6 +38,7 @@ from app.schemas.owner_acknowledgement import (
     PropertyOwnersRead,
     PropertyOwnerStatus,
 )
+from app.schemas.professional import ProfessionalRead
 from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
@@ -72,6 +80,25 @@ def create_institution_user(
     db.commit()
     db.refresh(inst_user)
     return inst_user
+
+
+@router.get("/professionals", response_model=list[ProfessionalRead])
+def list_professionals(
+    role: ProfessionalRole | None = None,
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    _principal: Principal = Depends(require_user_or_institution_user),
+    db: Session = Depends(get_db),
+):
+    inst_name = Institution.name.label("institutionName")
+    columns = (InstitutionUser.id, InstitutionUser.name, InstitutionUser.role, inst_name)
+    query = (
+        db.query(*columns)
+        .join(Institution, Institution.id == InstitutionUser.institutionId)
+        .filter(InstitutionUser.role.in_([role] if role else PROFESSIONAL_ROLES))
+    )
+    rows = query.order_by(InstitutionUser.name, InstitutionUser.id).limit(limit).offset(offset).all()
+    return [ProfessionalRead(**row._asdict()) for row in rows]
 
 
 LOAN_FIELDS = ("loanAmount", "currentBalance", "monthlyPayment", "dynamicBillingEnabled")
