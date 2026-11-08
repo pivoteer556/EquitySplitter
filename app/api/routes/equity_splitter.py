@@ -23,6 +23,7 @@ from app.models import (
     UserProperty,
 )
 from app.schemas.institution import InstitutionCreate, InstitutionRead, InstitutionUserCreate, InstitutionUserRead
+from app.schemas.listing import ListingRead
 from app.schemas.owner_acknowledgement import (
     AcknowledgementRead,
     OwnerInviteRead,
@@ -273,6 +274,21 @@ def list_properties(
     # selectinload: one extra query for all loans on the page instead of one lazy load per property.
     rows = query.options(selectinload(Property.loan)).limit(limit).offset(offset).all()
     return [_property_read(p) for p in rows]
+
+
+def _pending_listings(db: Session):
+    # Marketplace: every institution's pending properties; active ones stay institution/owner-scoped.
+    return db.query(Property).filter(Property.status == "pending_acknowledgement")
+
+
+@router.get("/listings", response_model=list[ListingRead])
+def list_listings(
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    _principal: Principal = Depends(require_user_or_institution_user),
+    db: Session = Depends(get_db),
+):
+    return _pending_listings(db).order_by(Property.createdAt.desc(), Property.id).limit(limit).offset(offset).all()
 
 
 def _readable_property(db: Session, principal: Principal, property_id: str) -> Property:
