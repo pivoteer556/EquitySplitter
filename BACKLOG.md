@@ -195,6 +195,8 @@ Decision: the CFPB's eight ability-to-repay factors (12 CFR 1026.43(c)) become a
 - Frontend errors: the more HTML-native scheme. Inline native validation (`:user-invalid`) plus a `role="alert"` region for server errors; `popover` toasts for confirmations; no library. *In progress (sign-in form done).*
 - Backlog items are struck through, never deleted (governance/audit trail). *Applied: this file.*
 
+- Playwright e2e is NOT wired into CI (user, 2026-11-08: free Azure account, avoid overloading it). Note: a CI e2e job would run on a GitHub runner with its own throwaway Postgres and would not touch Azure; the decision stands and can be reopened. The suite runs locally only (44 tests); a hosted-site e2e against Azure is likewise not planned. The backlog item for CI wiring is on hold, not deleted.
+
 ## Open decisions (user)
 
 - Do the Terraform state-secrets work before or after the remaining deploy work (leaning after)?
