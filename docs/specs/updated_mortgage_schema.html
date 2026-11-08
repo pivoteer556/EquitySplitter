@@ -1,11 +1,12 @@
-<!-- Synced with the code on 2026-11-07: models in app/models, migrations 0001-0008 in alembic/versions.
+<!-- Synced with the code on 2026-11-07: models in app/models, migrations 0001-0009 in alembic/versions.
      Before this sync the diagram still showed the retired OWNERSHIP table and sharePct/maxOwnershipPct names.
      0002 auth columns, tokenRevocations, authSecretState, uniqueness and immutability triggers; 0003 passwordHash widened to 255;
      0004 rateLimitHits; 0005 passwordHash NOT NULL and users.passwordSetAt; 0006 loans (property loan columns are
      transitional and dual-written until a later migration drops them);
      0007 connectionRequests (buyer asks a professional about a pending property; 2026-11-07);
-     0008 institutionUsers.passwordSetAt (NULL until an officer activates; existing rows backfilled; 2026-11-08). -->
-<p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0008 on 2026-11-08. The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
+     0008 institutionUsers.passwordSetAt (NULL until an officer activates; existing rows backfilled; 2026-11-08);
+     0009 propertyListings (marketing data, many per property, at most one 'listed' via a partial unique index; 2026-11-08). -->
+<p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0009 on 2026-11-08. The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
 
 <div id="erd"></div>
 <style>
@@ -73,6 +74,19 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     decimal currentBalance
     decimal monthlyPayment
     bool dynamicBillingEnabled
+    timestamptz createdAt
+  }
+  PROPERTY_LISTING {
+    uuid id PK
+    uuid propertyId FK "ON DELETE CASCADE, not unique"
+    string status "draft, listed, withdrawn, sold (text, not an enum); at most one listed per property"
+    decimal askingPrice
+    int bedrooms "nullable"
+    decimal bathrooms "nullable"
+    int squareFeet "nullable"
+    text description "nullable"
+    timestamptz listedAt "nullable"
+    timestamptz delistedAt "nullable"
     timestamptz createdAt
   }
   CONNECTION_REQUEST {
@@ -169,6 +183,7 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
   INSTITUTION ||--o{ PROPERTY : "owns book of"
   INSTITUTION_USER ||--o{ TOKEN_REVOCATION : "revoked by"
   PROPERTY ||--o| LOAN : "has"
+  PROPERTY ||--o{ PROPERTY_LISTING : "marketed as"
   PROPERTY ||--o| PROPERTY_AGREEMENT : "governed by"
   PROPERTY_AGREEMENT ||--o{ OWNER_ACKNOWLEDGEMENT : "signed by"
   USER ||--o{ USER_PROPERTY : "holds"

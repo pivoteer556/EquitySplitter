@@ -20,3 +20,10 @@ def test_offline_render_adds_and_backfills_institution_password_set_at(capsys):
     sql = capsys.readouterr().out
     assert 'ADD COLUMN "passwordSetAt"' in sql
     assert 'UPDATE "institutionUsers" SET "passwordSetAt"' in sql
+
+
+def test_offline_render_creates_property_listings_with_one_listed_per_property(capsys):
+    command.upgrade(Config("alembic.ini"), "0008_institution_password_set_at:0009_property_listings", sql=True)
+    sql = capsys.readouterr().out
+    assert 'CREATE TABLE "propertyListings"' in sql
+    assert "CREATE UNIQUE INDEX" in sql and "WHERE status = 'listed'" in sql
