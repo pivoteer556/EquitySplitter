@@ -1,6 +1,6 @@
 import json
 
-from tests.conftest import STRONG_PASSWORD, bearer
+from tests.conftest import STRONG_PASSWORD, bearer, bootstrap_officer
 from tests.test_accept_invite import _invited
 from tests.test_property_flow import _agreement, _property
 from tests.test_property_list import _owner_token, _second_officer
@@ -12,17 +12,7 @@ KEYS = {"id", "address", "status", "createdAt"}
 
 
 def _third_officer(client):
-    resp = client.post(
-        f"{API}/auth/institution/bootstrap",
-        json={
-            "institutionName": "Cirrus Credit",
-            "officerName": "Ci Officer",
-            "officerEmail": "ci@example.com",
-            "officerPassword": STRONG_PASSWORD,
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return bootstrap_officer(client, "Cirrus Credit", "Ci Officer", "ci@example.com")
 
 
 def _buyer_token(client):

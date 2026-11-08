@@ -85,12 +85,12 @@ def institution_bootstrap(payload: InstitutionBootstrapRequest, request: Request
         payload.institutionName,
         payload.officerName,
         payload.officerEmail,
-        payload.officerPassword,
     )
     return InstitutionBootstrapResponse(
-        accessToken=token,
         institution=InstitutionRead.model_validate(institution),
         institutionUser=InstitutionUserRead.model_validate(officer),
+        activationToken=token,
+        activationPath=f"/activate#token={token}",
     )
 
 

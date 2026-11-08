@@ -18,7 +18,6 @@ def _bootstrap(client, i, headers=None):
             "institutionName": f"Inst {i}",
             "officerName": f"O{i}",
             "officerEmail": f"o{i}@example.com",
-            "officerPassword": STRONG_PASSWORD,
         },
         headers=headers,
     )

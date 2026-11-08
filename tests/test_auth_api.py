@@ -1,35 +1,53 @@
 from tests.conftest import STRONG_PASSWORD, bearer
 
+BOOTSTRAP = "/api/v1/auth/institution/bootstrap"
+LOGIN = "/api/v1/auth/institution/login"
+ACTIVATE = "/api/v1/auth/institution/activate"
 
-def test_bootstrap_stores_argon2_hash(client, session_factory, officer):
+
+def _bootstrap_body(**extra):
+    base = {"institutionName": "Atlas Lending", "officerName": "Casey Officer", "officerEmail": "casey@example.com"}
+    return {**base, **extra}
+
+
+def test_bootstrap_returns_activation_link_and_no_session(client):
+    resp = client.post(BOOTSTRAP, json=_bootstrap_body())
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["activationPath"] == f"/activate#token={body['activationToken']}"
+    assert body["institutionUser"]["institutionId"] == body["institution"]["id"]
+    assert body["institutionUser"]["role"] == "loan_officer"
+    assert "accessToken" not in body and "tokenType" not in body
+    assert "passwordHash" not in resp.text and "password" not in body["institutionUser"]
+
+
+def test_bootstrap_officer_cannot_log_in_until_activated(client, session_factory):
     from app.models import InstitutionUser
 
+    body = client.post(BOOTSTRAP, json=_bootstrap_body()).json()
     db = session_factory()
     row = db.query(InstitutionUser).one()
+    assert row.passwordSetAt is None
+    db.close()
+    login = {"email": "casey@example.com", "password": STRONG_PASSWORD}
+    assert client.post(LOGIN, json=login).status_code == 401
+    activate = {"token": body["activationToken"], "password": STRONG_PASSWORD}
+    assert client.post(ACTIVATE, json=activate).status_code == 200
+    assert client.post(LOGIN, json=login).status_code == 200
+    db = session_factory()
+    row = db.query(InstitutionUser).one()
+    assert row.passwordSetAt is not None
     assert row.passwordHash.startswith("$argon2id$")
-    assert row.passwordSalt is None
     db.close()
 
 
-def test_bootstrap_rejects_weak_password(client):
-    resp = client.post(
-        "/api/v1/auth/institution/bootstrap",
-        json={"institutionName": "X", "officerName": "Y", "officerEmail": "y@example.com", "officerPassword": "weak"},
-    )
-    assert resp.status_code == 400
+def test_bootstrap_rejects_a_sent_password(client):
+    resp = client.post(BOOTSTRAP, json=_bootstrap_body(officerPassword=STRONG_PASSWORD))
+    assert resp.status_code == 422
 
 
 def test_bootstrap_rejects_duplicate_email(client, officer):
-    resp = client.post(
-        "/api/v1/auth/institution/bootstrap",
-        json={
-            "institutionName": "Other",
-            "officerName": "Dup",
-            "officerEmail": "casey@example.com",
-            "officerPassword": STRONG_PASSWORD,
-        },
-    )
-    assert resp.status_code == 409
+    assert client.post(BOOTSTRAP, json=_bootstrap_body(institutionName="Other")).status_code == 409
 
 
 def test_register_and_login(client):

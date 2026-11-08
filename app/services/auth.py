@@ -229,10 +229,9 @@ def bootstrap_institution(
     institution_name: str,
     officer_name: str,
     officer_email: str,
-    officer_password: str,
 ) -> tuple[Institution, InstitutionUser, str]:
-    validate_password_policy(officer_password)
-
+    """Create an institution and its first officer, who has no password until they activate. Returns the one-time
+    activation token (no session exists before activation)."""
     existing = db.query(InstitutionUser).filter(InstitutionUser.email == officer_email).first()
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -246,13 +245,13 @@ def bootstrap_institution(
         name=officer_name,
         email=officer_email,
         role="loan_officer",
-        passwordHash=hash_password(officer_password),
-        passwordSetAt=now_utc_seconds(),
+        passwordHash=unusable_password_hash(),
+        passwordSetAt=None,
     )
     db.add(officer)
-    db.flush()
+    db.commit()  # nothing below commits (refresh_and_store_institution_token used to)
 
-    token = refresh_and_store_institution_token(db, officer)
+    token = issue_institution_invite_token(db, officer.id)
     db.refresh(institution)
     db.refresh(officer)
     return institution, officer, token

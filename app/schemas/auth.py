@@ -1,6 +1,6 @@
 import re
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
 
@@ -49,10 +49,13 @@ class InstitutionRevokeRequest(BaseModel):
 
 
 class InstitutionBootstrapRequest(BaseModel):
+    # The first officer activates through a one-time link like every other officer, so a sent `officerPassword`
+    # is a 422 rather than silently ignored (same convention as InstitutionUserCreate).
+    model_config = ConfigDict(extra="forbid")
+
     institutionName: str
     officerName: str
     officerEmail: EmailStr
-    officerPassword: str
 
     @field_validator("officerEmail")
     @classmethod
@@ -64,7 +67,7 @@ class InstitutionBootstrapRequest(BaseModel):
 
 
 class InstitutionBootstrapResponse(BaseModel):
-    accessToken: str
-    tokenType: str = "Bearer"
     institution: InstitutionRead
     institutionUser: InstitutionUserRead
+    activationToken: str
+    activationPath: str

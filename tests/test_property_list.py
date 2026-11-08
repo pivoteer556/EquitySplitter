@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from app.models import Property
 from app.schemas.property import PropertyRead
-from tests.conftest import STRONG_PASSWORD, bearer
+from tests.conftest import bearer, bootstrap_officer
 from tests.test_accept_invite import _invited
 from tests.test_property_flow import _agreement, _property
 
@@ -11,17 +11,7 @@ URL = f"{API}/properties"
 
 
 def _second_officer(client):
-    resp = client.post(
-        f"{API}/auth/institution/bootstrap",
-        json={
-            "institutionName": "Borealis Bank",
-            "officerName": "Bo Officer",
-            "officerEmail": "bo@example.com",
-            "officerPassword": STRONG_PASSWORD,
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+    return bootstrap_officer(client, "Borealis Bank", "Bo Officer", "bo@example.com")
 
 
 def _owner_token(client, invite_token, email="owner@example.com"):

@@ -66,17 +66,23 @@ def client(session_factory):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture()
-def officer(client):
-    """Bootstrap an institution; returns the response body (accessToken, institution, institutionUser)."""
+def bootstrap_officer(client, institution_name, officer_name, officer_email):
+    """Bootstrap an institution and activate its first officer (bootstrap gives no session, only an activation link).
+    Returns the bootstrap body plus the activated officer's `accessToken`, so callers keep their old shape."""
     resp = client.post(
         "/api/v1/auth/institution/bootstrap",
-        json={
-            "institutionName": "Atlas Lending",
-            "officerName": "Casey Officer",
-            "officerEmail": "casey@example.com",
-            "officerPassword": STRONG_PASSWORD,
-        },
+        json={"institutionName": institution_name, "officerName": officer_name, "officerEmail": officer_email},
     )
     assert resp.status_code == 201, resp.text
-    return resp.json()
+    body = resp.json()
+    activated = client.post(
+        "/api/v1/auth/institution/activate", json={"token": body["activationToken"], "password": STRONG_PASSWORD}
+    )
+    assert activated.status_code == 200, activated.text
+    return {**body, "accessToken": activated.json()["accessToken"]}
+
+
+@pytest.fixture()
+def officer(client):
+    """Bootstrap and activate an institution; returns the response body plus accessToken (password STRONG_PASSWORD)."""
+    return bootstrap_officer(client, "Atlas Lending", "Casey Officer", "casey@example.com")
