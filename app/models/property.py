@@ -30,3 +30,4 @@ class Property(Base):
     )
     loan = relationship("Loan", back_populates="property", uselist=False, cascade="all, delete-orphan")
     userProperties =relationship("UserProperty", back_populates="property", cascade="all, delete-orphan")
+    connectionRequests = relationship("ConnectionRequest", cascade="all, delete-orphan", passive_deletes=False)

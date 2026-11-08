@@ -147,6 +147,8 @@ Notes:
 - `POST /api/v1/properties/{propertyId}/acknowledge`
 - `GET /api/v1/properties` (officer: own institution; owner: linked properties; `limit` 1-200 default 100, `offset`)
 - `GET /api/v1/professionals` (any buyer or officer: directory of institution users whose role is `loan_officer`, `underwriter` or `broker`, restricted to `id`, `name`, `role`, `institutionName`; no email or institution id; optional `role` filter, unknown role is 422; ordered by name then id; `limit` 1-200 default 100, `offset`)
+- `POST /api/v1/connection-requests` (buyer token only; body `professionalId`, `propertyId`, optional `message` up to 1000 chars; creates a `pending` request, 201. 404 `Professional not found` for a missing professional or one outside the role vocabulary, 404 `Property not found` for a missing or non-pending property, 409 `Connection already requested` for a repeat, 409 `Already an owner of this property`; response has no buyer email or institution ids)
+- `GET /api/v1/connection-requests` (buyer: own requests; professional: only requests addressed to that very institution user, not colleagues', plus `buyerName` and never the email; `limit` 1-200 default 100, `offset`; newest first)
 - `GET /api/v1/listings` (any owner/buyer or officer, any institution: pending properties only, restricted to `id`, `address`, `status`, `createdAt`; no loan, agreement or owner data; `limit` 1-200 default 100, `offset`)
 - `GET /api/v1/properties/{propertyId}`
 - `PATCH /api/v1/properties/{propertyId}` (officer of the property's institution, only while not active; partial update of address, loanAmount, currentBalance, monthlyPayment, dynamicBillingEnabled; unknown fields, nulls, empty body: 422)

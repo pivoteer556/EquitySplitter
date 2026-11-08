@@ -1,4 +1,5 @@
 from app.models.auth_secret_state import AuthSecretState
+from app.models.connection_request import ConnectionRequest
 from app.models.equity_ledger import EquityLedger
 from app.models.equity_transfer import EquityTransfer
 from app.models.institution import Institution
@@ -22,6 +23,7 @@ __all__ = [
     "Property",
     "PropertyAgreement",
     "Loan",
+    "ConnectionRequest",
     "UserProperty",
     "OwnerAcknowledgement",
     "PaymentCycle",

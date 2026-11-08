@@ -1,9 +1,10 @@
-<!-- Synced with the code on 2026-11-07: models in app/models, migrations 0001-0006 in alembic/versions.
+<!-- Synced with the code on 2026-11-07: models in app/models, migrations 0001-0007 in alembic/versions.
      Before this sync the diagram still showed the retired OWNERSHIP table and sharePct/maxOwnershipPct names.
      0002 auth columns, tokenRevocations, authSecretState, uniqueness and immutability triggers; 0003 passwordHash widened to 255;
      0004 rateLimitHits; 0005 passwordHash NOT NULL and users.passwordSetAt; 0006 loans (property loan columns are
-     transitional and dual-written until a later migration drops them). -->
-<p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0006 on 2026-11-07. The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
+     transitional and dual-written until a later migration drops them);
+     0007 connectionRequests (buyer asks a professional about a pending property; 2026-11-07). -->
+<p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0007 on 2026-11-07. The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
 
 <div id="erd"></div>
 <style>
@@ -71,6 +72,16 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     decimal monthlyPayment
     bool dynamicBillingEnabled
     timestamptz createdAt
+  }
+  CONNECTION_REQUEST {
+    uuid id PK
+    uuid buyerId FK "USER, ON DELETE CASCADE"
+    uuid professionalId FK "INSTITUTION_USER, ON DELETE CASCADE"
+    uuid propertyId FK "ON DELETE CASCADE"
+    string status "pending, accepted, declined, cancelled"
+    text message "nullable, max 1000 chars (API)"
+    timestamptz createdAt
+    timestamptz updatedAt "nullable"
   }
   PROPERTY_AGREEMENT {
     uuid id PK
@@ -168,6 +179,9 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
   USER_PROPERTY ||--o{ EQUITY_TRANSFER : "sold by"
   EQUITY_TRANSFER ||--o{ TRANSFER_CLAIM : "claimed via"
   USER_PROPERTY ||--o{ TRANSFER_CLAIM : "claimed by"
+  USER ||--o{ CONNECTION_REQUEST : "sends (UNIQUE buyer, professional, property)"
+  INSTITUTION_USER ||--o{ CONNECTION_REQUEST : "receives"
+  PROPERTY ||--o{ CONNECTION_REQUEST : "is about"
 `);
 document.getElementById('erd').innerHTML = svg;
 document.querySelectorAll('#erd svg .node').forEach(node => {
