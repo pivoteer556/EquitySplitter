@@ -3,6 +3,8 @@
 Ordered list of work. One item per change, each proven by a check that fails before and passes after.
 Update this file in the same commit that finishes an item.
 
+**Design docs stay in sync.** Any change to the schema, API, auth or roles also updates `docs/specs/` in the same commit (see `docs/specs/README.md`).
+
 **Items are never deleted.** A finished item is struck through (`~~like this~~`) and annotated with **Done**, the
 commit that finished it, and what is still unverified. The backlog doubles as an audit trail of what was asked, what
 was done, and how it was checked.
