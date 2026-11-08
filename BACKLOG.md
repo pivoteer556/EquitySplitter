@@ -46,8 +46,18 @@ Each is pinned by a `test.fail()` test in `frontend/app/e2e/signin.spec.ts`; whe
 4. **Logout leaves `institutionId` in localStorage (low, frontend).** `clearTokens()` does not clear it.
 5. Oddities: the password field keeps its value after a failed login; a 422 shows only the generic sentence, with no field-level message; the login page dumps the response JSON (token included) into a `<pre>` before navigating, which is fragile; 403/422 are not mapped by `friendlyError`.
 6. Design observation: the backend allows one active token per user, so a second device or tab signing in kills the first session (it also made parallel e2e workers flaky).
-7. **Decision needed (user said "no account should ever not have a password").** Invited users have a NULL `passwordHash` until they accept the invite, so a NOT NULL migration would break invites unless the flow changes (e.g. invite creates the account only on accept). Not done.
+7. ~~**Decision needed (user said "no account should ever not have a password").** Invited users have a NULL `passwordHash` until they accept the invite, so a NOT NULL migration would break invites unless the flow changes (e.g. invite creates the account only on accept). Not done.~~ **Decided** 2026-11-07: use an emailed invite LINK (not an emailed password); see section 2c.
 8. **Risk for CI wiring:** the e2e suite hit load-related timeouts in 2 of 3 full parallel runs (many argon2 hashes at once: a 5 s alert wait, an Edge teardown). Re-runs passed. Before wiring it into CI, limit workers or raise the timeouts, and run it repeatedly.
+
+## 2c. Invites by email and non-null passwords (user decision 2026-11-07)
+
+The user wants every account to have a password and invites delivered by an emailed link. Steps, in order, one commit each:
+
+1. Frontend accept-invite page: reads the token from the link fragment (`#token=...`, never sent to servers or logs), sets the password via the existing accept-invite endpoint. First check the backend rejects reuse of an accepted token.
+2. Migration: backfill NULL `passwordHash` with an unusable random hash, then make the column NOT NULL; new invites store the same kind of hash. Includes the invite-flow tests.
+3. Mail seam in the backend: `send_invite_email(to, link)` with a log/console backend for local use and tests. No provider yet.
+4. Real provider (user to choose; recommended Azure Communication Services Email with the Azure-managed domain; needs Terraform, the user's `apply`, a connection-string secret, a new dependency through the pip-audit gate). Not verified that Terraform covers it; check first.
+5. Wire sending into the invite flow and verify end to end with a real email to an address the user controls.
 
 ## 3. Deploy hardening
 
