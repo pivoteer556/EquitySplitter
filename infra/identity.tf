@@ -17,6 +17,14 @@ resource "random_password" "jwt_secret_seed" {
   special = false
 }
 
+# Setup token for POST /auth/institution/bootstrap (header X-Bootstrap-Token). Whoever holds it
+# can create a new institution; without it the endpoint answers 404. Read it with
+# `terraform output -raw bootstrap_token`.
+resource "random_password" "bootstrap_token" {
+  length  = 32
+  special = false
+}
+
 # --- Key Vault ---
 
 data "azurerm_client_config" "current" {}
@@ -87,6 +95,15 @@ resource "azurerm_role_assignment" "app_key_vault_reader" {
 resource "azurerm_key_vault_secret" "jwt_secret_seed" {
   name         = "jwt-secret-seed"
   value        = random_password.jwt_secret_seed.result
+  key_vault_id = azurerm_key_vault.main.id
+  tags         = var.tags
+
+  depends_on = [azurerm_role_assignment.key_vault_applier]
+}
+
+resource "azurerm_key_vault_secret" "bootstrap_token" {
+  name         = "bootstrap-token"
+  value        = random_password.bootstrap_token.result
   key_vault_id = azurerm_key_vault.main.id
   tags         = var.tags
 

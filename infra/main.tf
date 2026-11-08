@@ -135,6 +135,12 @@ resource "azurerm_container_app" "api" {
     identity            = azurerm_user_assigned_identity.app.id
   }
 
+  secret {
+    name                = "bootstrap-token"
+    key_vault_secret_id = azurerm_key_vault_secret.bootstrap_token.versionless_id
+    identity            = azurerm_user_assigned_identity.app.id
+  }
+
   ingress {
     external_enabled = true
     target_port      = 80 # placeholder image port; the deploy workflow changes it to 8000
@@ -182,6 +188,10 @@ resource "azurerm_container_app" "api" {
       env {
         name        = "JWT_SECRET_SEED"
         secret_name = "jwt-secret-seed"
+      }
+      env {
+        name        = "BOOTSTRAP_TOKEN"
+        secret_name = "bootstrap-token"
       }
     }
   }

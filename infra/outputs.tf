@@ -52,3 +52,10 @@ output "static_web_app_api_key" {
   value     = azurerm_static_web_app.web.api_key
   sensitive = true
 }
+
+# The setup token for creating institutions. Read it with `terraform output -raw bootstrap_token`.
+# It is also in state and Key Vault.
+output "bootstrap_token" {
+  value     = random_password.bootstrap_token.result
+  sensitive = true
+}
