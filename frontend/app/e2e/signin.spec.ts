@@ -96,6 +96,8 @@ test.describe('real backend responses', () => {
   });
 
   test('real 429 after the real failed-login threshold, even with the CORRECT password afterwards', async ({ page }) => {
+    // Each login runs a deliberately slow password hash; 5 failures + 1 success sit near the 30 s default under load.
+    test.slow();
     const user = await makeUser('lockout');
     for (let i = 0; i < 5; i++) {
       await fill(page, user.email, 'Wrong!Passw0rd#9');
@@ -113,6 +115,8 @@ test.describe('real backend responses', () => {
   });
 
   test('lockout is per email: a locked-out account does not lock out another user', async ({ page }) => {
+    // Each login runs a deliberately slow password hash; 5 failures + 1 success sit near the 30 s default under load.
+    test.slow();
     const victim = await makeUser('victim');
     const other = await makeUser('other');
     for (let i = 0; i < 5; i++) {

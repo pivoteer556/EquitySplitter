@@ -21,6 +21,9 @@ export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
+  // Every login runs a deliberately slow password hash on one shared backend; many workers starve each other
+  // (load-dependent timeouts in earlier runs). Two keeps the suite fast enough and stable.
+  workers: 2,
   forbidOnly: !!process.env['CI'],
   retries: 0,
   reporter: [['list']],
