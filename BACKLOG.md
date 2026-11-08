@@ -78,6 +78,14 @@ Decisions needed from the user before building (these change what "delete" means
 
 Proposed order, one entity per run, each as API + tests (incl. cross-institution authorization tests) then UI (list, detail, create, edit, delete with a native `<dialog>` confirm): Property (list/update/delete) -> PropertyAgreement -> owners/UserProperty -> InstitutionUser -> Institution/profile -> financial entities last.
 
+Progress and rules (user answer 2026-11-07: a property is removed only when an officer withdraws an un-sold house, or the owners split the house):
+
+- ~~`GET /properties` list~~ **Done** (this commit): officers see their institution's properties, owners only their linked ones; `limit`/`offset`; 9 tests incl. cross-institution isolation. New dependency `require_user_or_institution_user` in `app/api/deps/auth.py`.
+- Officer update of a property, its agreement and its owners: only while `pending_acknowledgement` (matches the existing lock once active).
+- Officer delete: only while never activated; hard delete is acceptable then.
+- Owner split of an ACTIVE property: needs all owners' consent, ends in a `dissolved` status and keeps history. **Blocked on the user:** what a split means for the loan (end co-ownership only, or separate properties/loans).
+- Gap found: `GET /properties/{id}` and `/owners` accept user tokens only; officers cannot read a single property. Add the dual dependency plus an institution check.
+
 ## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).

@@ -1,10 +1,16 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_institution_user, require_user, require_user_property_scope
+from app.api.deps.auth import (
+    Principal,
+    require_institution_user,
+    require_user,
+    require_user_or_institution_user,
+    require_user_property_scope,
+)
 from app.db.session import get_db
 from app.models import (
     Institution,
@@ -219,6 +225,28 @@ def acknowledge_agreement(
     db.commit()
     db.refresh(ack)
     return ack
+
+
+def _visible_properties(db: Session, principal: Principal):
+    # Officers see their whole institution; owners see only the properties they are linked to.
+    query = db.query(Property)
+    if principal.user_type == "institution_user":
+        return query.filter(Property.institutionId == principal.institution_id)
+    return query.join(UserProperty, UserProperty.propertyId == Property.id).filter(
+        UserProperty.userId == principal.user_id
+    )
+
+
+@router.get("/properties", response_model=list[PropertyRead])
+def list_properties(
+    response: Response,
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    principal: Principal = Depends(require_user_or_institution_user),
+    db: Session = Depends(get_db),
+):
+    query = _visible_properties(db, principal).order_by(Property.createdAt.desc(), Property.id)
+    return query.limit(limit).offset(offset).all()
 
 
 @router.get("/properties/{propertyId}", response_model=PropertyDetailRead)

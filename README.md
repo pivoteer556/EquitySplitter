@@ -145,6 +145,7 @@ Notes:
 - `POST /api/v1/properties/{propertyId}/agreement`
 - `POST /api/v1/properties/{propertyId}/owners`
 - `POST /api/v1/properties/{propertyId}/acknowledge`
+- `GET /api/v1/properties` (officer: own institution; owner: linked properties; `limit` 1-200 default 100, `offset`)
 - `GET /api/v1/properties/{propertyId}`
 - `GET /api/v1/properties/{propertyId}/owners`
 - `GET /health`

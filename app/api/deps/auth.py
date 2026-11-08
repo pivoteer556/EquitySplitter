@@ -34,8 +34,11 @@ def require_user(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Principal:
-    token = _extract_bearer(authorization)
-    claims = decode_token(db, token)
+    claims = decode_token(db, _extract_bearer(authorization))
+    return _user_principal(response, db, claims)
+
+
+def _user_principal(response: Response, db: Session, claims: dict) -> Principal:
     if claims.get("userType") != "user":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
 
@@ -55,8 +58,11 @@ def require_institution_user(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Principal:
-    token = _extract_bearer(authorization)
-    claims = decode_token(db, token)
+    claims = decode_token(db, _extract_bearer(authorization))
+    return _institution_principal(response, db, claims)
+
+
+def _institution_principal(response: Response, db: Session, claims: dict) -> Principal:
     if claims.get("userType") != "institution_user":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
 
@@ -70,6 +76,18 @@ def require_institution_user(
     refreshed = refresh_and_store_institution_token(db, inst_user)
     response.headers["X-Refreshed-Token"] = refreshed
     return Principal(user_id=inst_user.id, user_type="institution_user", institution_id=inst_user.institutionId)
+
+
+def require_user_or_institution_user(
+    response: Response,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Accept either identity type; any other userType (e.g. invite) gets the usual 403 from require_user."""
+    claims = decode_token(db, _extract_bearer(authorization))
+    if claims.get("userType") == "institution_user":
+        return _institution_principal(response, db, claims)
+    return _user_principal(response, db, claims)
 
 
 def require_user_property_scope(
