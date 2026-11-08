@@ -118,6 +118,17 @@ Listing fields agreed (user): a buyer sees non-loan information only. ~~Step 3 b
 
 Then, one run each: a role vocabulary check; a public pending-listing endpoint with a restricted response schema (and tests that no private field leaks); a professionals directory; the ConnectionRequest model + migration + endpoints; UI for each.
 
+## 2f. Officers do not choose passwords: activation links (user direction 2026-11-07)
+
+User statement: loan officer passwords should not be a thing; the system chooses them and the officer resets on activating. Design (equivalent, no secret delivered): officer accounts are created with an unusable placeholder hash and activate through a one-time link, like owner invites. Steps, in order, one commit each, each updating `docs/specs/` and `BACKLOG.md`:
+
+1. `institution_users.passwordSetAt` (migration 0008; existing rows backfilled as already set) + activation token (userType e.g. `institution_invite`, 7 days) + `POST /auth/institution/activate` {token, password} (single-use via the marker; same rate-limit budget and policy as accept-invite).
+2. `POST /institution-users` takes no password; creates the officer with a placeholder hash; returns an activation token/link.
+3. `POST /auth/institution/bootstrap` takes no officer password; returns the first officer's activation token.
+4. Frontend: bootstrap form drops the password field and shows the activation link; `/activate#token=...` page. Update e2e global-setup/makeUser and the officer-related specs (they currently log in with typed passwords).
+5. Docs: Feature 2 spec (credentials, onboarding), schema page.
+Open: until email exists the link is shown on screen / returned by the API and passed on out of band. Starts after the connection-request backend lands (same files).
+
 ## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).
