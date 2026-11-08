@@ -29,7 +29,7 @@ from app.schemas.owner_acknowledgement import (
     PropertyOwnersRead,
     PropertyOwnerStatus,
 )
-from app.schemas.property import PropertyCreate, PropertyRead
+from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
 from app.services.auth import hash_password, issue_invite_token, unusable_password_hash, validate_password_policy
@@ -278,6 +278,24 @@ def get_property(
         if agreement
         else PropertyAgreementRead.model_validate({}).model_dump(),
     }
+
+
+@router.patch("/properties/{propertyId}", response_model=PropertyRead)
+def update_property(
+    propertyId: str,
+    payload: PropertyUpdate,
+    response: Response,
+    principal: Principal = Depends(require_institution_user),
+    db: Session = Depends(get_db),
+):
+    prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
+    if prop.status == "active":
+        raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(prop, field, value)
+    db.commit()
+    db.refresh(prop)
+    return prop
 
 
 @router.get("/properties/{propertyId}/owners", response_model=PropertyOwnersRead)

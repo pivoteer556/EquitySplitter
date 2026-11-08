@@ -82,6 +82,10 @@ Progress and rules (user answer 2026-11-07: a property is removed only when an o
 
 - ~~`GET /properties` list~~ **Done** (this commit): officers see their institution's properties, owners only their linked ones; `limit`/`offset`; 9 tests incl. cross-institution isolation. New dependency `require_user_or_institution_user` in `app/api/deps/auth.py`.
 - Officer update of a property, its agreement and its owners: only while `pending_acknowledgement` (matches the existing lock once active).
+  - ~~Property fields (`PATCH /properties/{id}`)~~ **Done** (this commit): partial update of address/amounts/billing flag; unknown fields, nulls and empty body are 422; active -> 403; other institution -> 404; 22 tests. Still open: agreement update, owners update.
+- **BUG found (real, user-visible): `GET /properties/{id}` returns 500 for a property with no agreement** (`PropertyAgreementRead.model_validate({})` raises around `equity_splitter.py` ~line 279; `list_owners` has the same pattern). A freshly created property has no agreement, and marketplace buyers will browse exactly those. Fix before the marketplace work.
+- Inconsistency: `PropertyCreate.address` accepts an empty string while `PropertyUpdate.address` requires `min_length=1`. Align create.
+
 - Officer delete: only while never activated; hard delete is acceptable then.
 - Owner split of an ACTIVE property: needs all owners' consent, ends in a `dissolved` status and keeps history. **Blocked on the user:** what a split means for the loan (end co-ownership only, or separate properties/loans).
 - ~~Gap found: `GET /properties/{id}` and `/owners` accept user tokens only; officers cannot read a single property. Add the dual dependency plus an institution check.~~ **Done** (this commit): officers read their own institution's property and owners list; another institution's property returns 404, identical to a nonexistent id. Minor leftover: an UNLINKED OWNER still gets 403 (not 404) for an existing property, so owners can probe for existing ids (UUIDs, low risk); the existing test pins that 403.

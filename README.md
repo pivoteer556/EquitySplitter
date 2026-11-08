@@ -147,6 +147,7 @@ Notes:
 - `POST /api/v1/properties/{propertyId}/acknowledge`
 - `GET /api/v1/properties` (officer: own institution; owner: linked properties; `limit` 1-200 default 100, `offset`)
 - `GET /api/v1/properties/{propertyId}`
+- `PATCH /api/v1/properties/{propertyId}` (officer of the property's institution, only while not active; partial update of address, loanAmount, currentBalance, monthlyPayment, dynamicBillingEnabled; unknown fields, nulls, empty body: 422)
 - `GET /api/v1/properties/{propertyId}/owners`
 - `GET /health`
 
