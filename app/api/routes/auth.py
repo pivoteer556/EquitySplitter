@@ -22,6 +22,7 @@ from app.schemas.institution import InstitutionRead, InstitutionUserRead
 from app.services.auth import (
     accept_invite,
     bootstrap_institution,
+    burn_password_check,
     hash_password,
     refresh_and_store_institution_token,
     refresh_and_store_user_token,
@@ -112,7 +113,8 @@ def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get
     _enforce_login_limit(db, key)
     user = db.query(User).filter(User.email == payload.email).first()
     if user is None or user.passwordHash is None:
-        _fail_login(db, key, status.HTTP_403_FORBIDDEN, "Password reset required")
+        burn_password_check(payload.password)
+        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not verify_and_upgrade_password(db, user, payload.password):
         _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     login_limiter.reset(db, key)
@@ -133,7 +135,8 @@ def institution_login(payload: AuthLoginRequest, request: Request, db: Session =
     _enforce_login_limit(db, key)
     inst_user = db.query(InstitutionUser).filter(InstitutionUser.email == payload.email).first()
     if inst_user is None or inst_user.passwordHash is None:
-        _fail_login(db, key, status.HTTP_403_FORBIDDEN, "Password reset required")
+        burn_password_check(payload.password)
+        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not verify_and_upgrade_password(db, inst_user, payload.password):
         _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     login_limiter.reset(db, key)

@@ -74,17 +74,16 @@ test.describe('real backend responses', () => {
     await expect(page.locator('#login-password')).toHaveValue('Wrong!Passw0rd#9');
   });
 
-  test('unknown email -> real 403 "Password reset required" is surfaced verbatim', async ({ page }) => {
+  test('unknown email -> real 401 "Invalid credentials" is mapped to the generic message', async ({ page }) => {
     await fill(page, `ghost-${Date.now()}@e2e.example.com`, 'Wrong!Passw0rd#9');
     const resp = page.waitForResponse(LOGIN_API);
     await loginButton(page).click();
-    expect((await resp).status()).toBe(403);
-    await expect(alertBox(page)).toHaveText('Password reset required');
+    expect((await resp).status()).toBe(401);
+    await expect(alertBox(page)).toHaveText('Incorrect email or password.');
     await expectNoSession(page);
   });
 
   test('unknown email and wrong password show the same message (no account enumeration)', async ({ page }) => {
-    test.fail(true, 'Known defect: backend answers 403 for unknown email vs 401 for wrong password; UI shows different text.');
     const user = await makeUser('enum');
     await fill(page, user.email, 'Wrong!Passw0rd#9');
     await loginButton(page).click();
@@ -174,7 +173,7 @@ test.describe('real backend responses', () => {
     await fill(page, 'a'.repeat(10_000) + '@e2e.example.com', 'x');
     const r2 = page.waitForResponse(LOGIN_API);
     await loginButton(page).click();
-    expect([403, 422]).toContain((await r2).status());
+    expect([401, 422]).toContain((await r2).status());
     await expect(alertBox(page)).toBeVisible();
     await expectNoSession(page);
   });

@@ -61,6 +61,17 @@ def hash_password(password: str) -> str:
     return _hasher.hash(password)
 
 
+_DUMMY_HASH = _hasher.hash("dummy-password-for-constant-time-login")
+
+
+def burn_password_check(password: str) -> None:
+    """Spend one argon2 verification so a missing or hash-less account takes as long as a wrong password."""
+    try:
+        _hasher.verify(_DUMMY_HASH, password)
+    except VerificationError:
+        pass
+
+
 def _verify_legacy_sha256(password: str, salt: str, password_hash: str) -> bool:
     candidate = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
     return hmac.compare_digest(candidate, password_hash)

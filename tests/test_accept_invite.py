@@ -51,10 +51,10 @@ def _signed(session_factory, claims):
 
 def test_accept_invite_sets_password_and_allows_login(client, officer):
     prop, token = _invited(client, officer)
-    # Before accepting, login is refused exactly as before.
+    # Before accepting, login is refused with the generic 401.
     assert (
         client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code
-        == 403
+        == 401
     )
 
     resp = _accept(client, token)
@@ -111,7 +111,7 @@ def test_access_token_is_not_an_invite_token(client, officer, session_factory):
     assert _accept(client, access).status_code == 401
     assert (
         client.post(f"{API}/auth/login", json={"email": "owner@example.com", "password": NEW_PASSWORD}).status_code
-        == 403
+        == 401
     )
 
 

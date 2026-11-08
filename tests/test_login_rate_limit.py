@@ -13,7 +13,7 @@ def _login(client, url, password, email=EMAIL):
 
 def _fail_until_blocked(client, url, email=EMAIL):
     for _ in range(MAX_FAILURES):
-        assert _login(client, url, "wrong-password", email).status_code in (401, 403)
+        assert _login(client, url, "wrong-password", email).status_code == 401
 
 
 @pytest.mark.parametrize("url", LOGIN_URLS)

@@ -56,9 +56,9 @@ def test_register_rejects_weak_password_and_duplicate(client):
     assert client.post("/api/v1/auth/register", json=body).status_code == 409
 
 
-def test_login_unknown_account_requires_reset(client):
+def test_login_unknown_account_is_generic_failure(client):
     resp = client.post("/api/v1/auth/login", json={"email": "nobody@example.com", "password": STRONG_PASSWORD})
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 def test_institution_login(client, officer):
