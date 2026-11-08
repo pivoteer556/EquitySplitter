@@ -149,6 +149,7 @@ Notes:
 - `GET /api/v1/listings` (any owner/buyer or officer, any institution: pending properties only, restricted to `id`, `address`, `status`, `createdAt`; no loan, agreement or owner data; `limit` 1-200 default 100, `offset`)
 - `GET /api/v1/properties/{propertyId}`
 - `PATCH /api/v1/properties/{propertyId}` (officer of the property's institution, only while not active; partial update of address, loanAmount, currentBalance, monthlyPayment, dynamicBillingEnabled; unknown fields, nulls, empty body: 422)
+- `DELETE /api/v1/properties/{propertyId}` (officer of the property's institution, only while not active; hard delete of the property, agreement, loan and owner links, owner accounts stay; 204; other institution or missing: 404; active: 403)
 - `GET /api/v1/properties/{propertyId}/owners`
 - `GET /health`
 

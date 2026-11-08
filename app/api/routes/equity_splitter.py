@@ -346,6 +346,20 @@ def update_property(
     return _property_read(prop)
 
 
+@router.delete("/properties/{propertyId}", status_code=204)
+def delete_property(
+    propertyId: str,
+    principal: Principal = Depends(require_institution_user),
+    db: Session = Depends(get_db),
+):
+    prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
+    if prop.status == "active":
+        raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
+    db.delete(prop)  # ORM cascades remove agreement, loan, owner links and their acknowledgements; Users stay
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.get("/properties/{propertyId}/owners", response_model=PropertyOwnersRead)
 def list_owners(
     propertyId: str,
