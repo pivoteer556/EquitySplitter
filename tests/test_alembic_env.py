@@ -13,3 +13,10 @@ def test_database_url_with_percent_encoding_reaches_alembic_unchanged(monkeypatc
 
     assert cfg.get_main_option("sqlalchemy.url") == url
     capsys.readouterr()
+
+
+def test_offline_render_adds_and_backfills_institution_password_set_at(capsys):
+    command.upgrade(Config("alembic.ini"), "0007_connection_requests:0008_institution_password_set_at", sql=True)
+    sql = capsys.readouterr().out
+    assert 'ADD COLUMN "passwordSetAt"' in sql
+    assert 'UPDATE "institutionUsers" SET "passwordSetAt"' in sql

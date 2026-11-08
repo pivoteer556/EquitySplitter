@@ -42,7 +42,13 @@ from app.schemas.professional import ProfessionalRead
 from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
-from app.services.auth import hash_password, issue_invite_token, unusable_password_hash, validate_password_policy
+from app.services.auth import (
+    hash_password,
+    issue_invite_token,
+    now_utc_seconds,
+    unusable_password_hash,
+    validate_password_policy,
+)
 
 router = APIRouter()
 
@@ -75,7 +81,7 @@ def create_institution_user(
     validate_password_policy(payload.password)
     raw = payload.model_dump()
     password = raw.pop("password")
-    inst_user = InstitutionUser(**raw, passwordHash=hash_password(password))
+    inst_user = InstitutionUser(**raw, passwordHash=hash_password(password), passwordSetAt=now_utc_seconds())
     db.add(inst_user)
     db.commit()
     db.refresh(inst_user)

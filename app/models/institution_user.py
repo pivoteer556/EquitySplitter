@@ -22,6 +22,7 @@ class InstitutionUser(Base):
     lastTokenIssuedAt: Mapped[datetime | None] = mapped_column(
         "lastTokenIssuedAt", DateTime(timezone=True), nullable=True
     )
+    passwordSetAt: Mapped[datetime | None] = mapped_column("passwordSetAt", DateTime(timezone=True), nullable=True)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="loan_officer")
     createdAt: Mapped[DateTime] = mapped_column(
         "createdAt", DateTime(timezone=True), nullable=False, server_default=func.now()

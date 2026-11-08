@@ -21,6 +21,7 @@ from app.schemas.auth import (
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
 from app.services.auth import (
     accept_invite,
+    activate_institution_user,
     bootstrap_institution,
     burn_password_check,
     hash_password,
@@ -132,6 +133,13 @@ def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get
 def accept_invite_route(payload: AcceptInviteRequest, request: Request, db: Session = Depends(get_db)):
     _enforce_signup_limit(db, request, scope="accept-invite")
     _, token = accept_invite(db, payload.token, payload.password)
+    return AuthTokenResponse(accessToken=token)
+
+
+@router.post("/institution/activate", response_model=AuthTokenResponse)
+def institution_activate(payload: AcceptInviteRequest, request: Request, db: Session = Depends(get_db)):
+    _enforce_signup_limit(db, request, scope="institution-activate")
+    _, token = activate_institution_user(db, payload.token, payload.password)
     return AuthTokenResponse(accessToken=token)
 
 

@@ -117,6 +117,19 @@ def issue_invite_token(db: Session, user_id: UUID) -> str:
     return jwt.encode(claims, ensure_secret_state(db).currentSecret, algorithm="HS256")
 
 
+def issue_institution_invite_token(db: Session, institution_user_id: UUID) -> str:
+    """Like issue_invite_token, for an officer's one-time activation link. userType="institution_invite" keeps it out
+    of every auth dependency. Single-use is enforced by activate_institution_user (passwordSetAt must be unset)."""
+    iat_dt = now_utc_seconds()
+    claims = {
+        "sub": str(institution_user_id),
+        "userType": "institution_invite",
+        "iat": int(iat_dt.timestamp()),
+        "exp": int((iat_dt + timedelta(days=INVITE_TOKEN_DAYS)).timestamp()),
+    }
+    return jwt.encode(claims, ensure_secret_state(db).currentSecret, algorithm="HS256")
+
+
 def decode_token(db: Session, token: str) -> dict:
     state = ensure_secret_state(db)
     secrets_to_try = [state.currentSecret]
@@ -194,6 +207,23 @@ def refresh_and_store_institution_token(db: Session, inst_user: InstitutionUser)
     return token
 
 
+def activate_institution_user(db: Session, token: str, password: str) -> tuple[InstitutionUser, str]:
+    """Set the password of a not-yet-activated officer and log them in. Mirrors accept_invite."""
+    claims = decode_token(db, token)
+    if claims.get("userType") != "institution_invite":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    try:
+        officer = db.get(InstitutionUser, UUID(claims["sub"]))
+    except (KeyError, ValueError):
+        officer = None
+    if officer is None or officer.passwordSetAt is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired invite")
+    validate_password_policy(password)
+    officer.passwordHash = hash_password(password)
+    officer.passwordSetAt = now_utc_seconds()
+    return officer, refresh_and_store_institution_token(db, officer)  # commits the hash and the session iat together
+
+
 def bootstrap_institution(
     db: Session,
     institution_name: str,
@@ -217,6 +247,7 @@ def bootstrap_institution(
         email=officer_email,
         role="loan_officer",
         passwordHash=hash_password(officer_password),
+        passwordSetAt=now_utc_seconds(),
     )
     db.add(officer)
     db.flush()
