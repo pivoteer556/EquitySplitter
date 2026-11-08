@@ -59,6 +59,25 @@ The user wants every account to have a password and invites delivered by an emai
 4. Real provider (user to choose; recommended Azure Communication Services Email with the Azure-managed domain; needs Terraform, the user's `apply`, a connection-string secret, a new dependency through the pip-audit gate). Not verified that Terraform covers it; check first.
 5. Wire sending into the invite flow and verify end to end with a real email to an address the user controls.
 
+## 2d. CRUD the whole backend from the UI (user direction 2026-11-07)
+
+Audit of `app/api/routes` on 2026-11-07: the API is almost write-only. Only two GETs exist (`/properties/{id}`, `/properties/{id}/owners`), there are no list endpoints, and no update or delete endpoints. So this is mostly BACKEND work first, then UI per entity.
+
+| Entity (model) | Today | Missing for full CRUD |
+|---|---|---|
+| Institution | create (bootstrap, POST /institutions) | read, list, update, delete |
+| InstitutionUser | create, login, revoke | list, read, update (role, name), delete/deactivate |
+| User (owner) | register, login, accept-invite | read self, update profile/password, delete account |
+| Property | create, read one | list, update, delete |
+| PropertyAgreement | create (attach) | read, update, delete |
+| UserProperty (owners/invites) | invite, list owners | update (ownership %), remove, re-invite |
+| OwnerAcknowledgement | acknowledge | read (via property today) |
+| EquityLedger, EquityTransfer, TransferClaim, Payment, PaymentCycle | models only, NO endpoints | everything |
+
+Decisions needed from the user before building (these change what "delete" means): (1) who may do what (officer vs owner; per-institution isolation is mandatory); (2) soft delete (deactivate, keep history) vs hard delete, especially for anything financial; (3) the ledger/transfer/payment entities are probably append-only records: full CRUD there would be wrong, so confirm what "CRUD" should mean for them (create + read + correct-by-reversal, not edit/delete); (4) the equity business rules the ledger must keep (needs the user's domain knowledge).
+
+Proposed order, one entity per run, each as API + tests (incl. cross-institution authorization tests) then UI (list, detail, create, edit, delete with a native `<dialog>` confirm): Property (list/update/delete) -> PropertyAgreement -> owners/UserProperty -> InstitutionUser -> Institution/profile -> financial entities last.
+
 ## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).
