@@ -14,7 +14,8 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(apiBase)) {
 }
 
 const repoRoot = resolve(__dirname, '..', '..');
-const python = resolve(repoRoot, '.venv', 'Scripts', 'python.exe');
+// Local default is the Windows venv; CI sets E2E_PYTHON=python (the setup-python interpreter).
+const python = process.env['E2E_PYTHON'] ?? resolve(repoRoot, '.venv', 'Scripts', 'python.exe');
 const databaseUrl = 'postgresql+psycopg://postgres:postgres@localhost:55432/equity_e2e';
 
 export default defineConfig({
