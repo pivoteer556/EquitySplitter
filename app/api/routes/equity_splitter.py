@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps.auth import (
     Principal,
@@ -81,6 +81,20 @@ def _loan_from(prop: Property) -> Loan:
     return Loan(**{f: getattr(prop, f) for f in LOAN_FIELDS if getattr(prop, f) is not None})
 
 
+def _property_read(prop: Property) -> PropertyRead:
+    # The Loan row is the source of truth for the loan fields; the legacy property columns are only a fallback
+    # for a property without a Loan row (until those columns are dropped).
+    loan_source = prop.loan if prop.loan is not None else prop
+    return PropertyRead(
+        id=prop.id,
+        institutionId=prop.institutionId,
+        address=prop.address,
+        status=prop.status,
+        createdAt=prop.createdAt,  # type: ignore[arg-type]
+        **{f: getattr(loan_source, f) for f in LOAN_FIELDS},
+    )
+
+
 @router.post("/properties", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 def create_property(
     payload: PropertyCreate,
@@ -96,7 +110,7 @@ def create_property(
     db.add(prop)
     db.commit()
     db.refresh(prop)
-    return prop
+    return _property_read(prop)
 
 
 @router.post(
@@ -256,7 +270,9 @@ def list_properties(
     db: Session = Depends(get_db),
 ):
     query = _visible_properties(db, principal).order_by(Property.createdAt.desc(), Property.id)
-    return query.limit(limit).offset(offset).all()
+    # selectinload: one extra query for all loans on the page instead of one lazy load per property.
+    rows = query.options(selectinload(Property.loan)).limit(limit).offset(offset).all()
+    return [_property_read(p) for p in rows]
 
 
 def _readable_property(db: Session, principal: Principal, property_id: str) -> Property:
@@ -283,7 +299,7 @@ def get_property(
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     return {
-        "property": PropertyRead.model_validate(prop).model_dump(),
+        "property": _property_read(prop).model_dump(),
         "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else None,
     }
 
@@ -299,16 +315,19 @@ def update_property(
     prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
     if prop.status == "active":
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(prop, field, value)
     if prop.loan is None:
         prop.loan = _loan_from(prop)
     else:
+        # Dual-write only what changed, so an unrelated edit never overwrites the Loan row with legacy values.
         for field in LOAN_FIELDS:
-            setattr(prop.loan, field, getattr(prop, field))
+            if field in changes:
+                setattr(prop.loan, field, changes[field])
     db.commit()
     db.refresh(prop)
-    return prop
+    return _property_read(prop)
 
 
 @router.get("/properties/{propertyId}/owners", response_model=PropertyOwnersRead)
