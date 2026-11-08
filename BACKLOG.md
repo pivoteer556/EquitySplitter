@@ -16,6 +16,10 @@ Prefer native platform features over TypeScript: real `<form>` elements with `re
 CSS `:has()` / container queries / nesting. Keep Angular bindings and `friendlyError` only where a plain page cannot
 talk to the API without script.
 
+## Doc sync log
+
+- 2026-11-07 (commit after e6988be): `docs/specs/` synced to migration 0006 / HEAD 9de05a4 (Feature 1 and 2 specs amended with a dated change log, ER diagram redrawn with all 16 tables, README index added). Not rendered: no LibreOffice on this machine, so docx layout and the Mermaid ER diagram are unchecked visually. Next sync starts after migration 0006.
+
 ## 1. Frontend hosting (top priority, user 2026-11-07)
 
 Goal: a public URL for the frontend (`https://<name>.azurestaticapps.net`). Steps, in order, one commit each:

@@ -1,3 +1,9 @@
+<!-- Synced with the code on 2026-11-07: models in app/models, migrations 0001-0006 in alembic/versions.
+     Before this sync the diagram still showed the retired OWNERSHIP table and sharePct/maxOwnershipPct names.
+     0002 auth columns, tokenRevocations, authSecretState, uniqueness and immutability triggers; 0003 passwordHash widened to 255;
+     0004 rateLimitHits; 0005 passwordHash NOT NULL and users.passwordSetAt; 0006 loans (property loan columns are
+     transitional and dual-written until a later migration drops them). -->
+<p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0006 on 2026-11-07. The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
 
 <div id="erd"></div>
 <style>
@@ -20,13 +26,51 @@ mermaid.initialize({
   },
 });
 const { svg } = await mermaid.render('erd-svg', `erDiagram
+  INSTITUTION {
+    uuid id PK
+    string name
+    timestamptz createdAt
+  }
+  INSTITUTION_USER {
+    uuid id PK
+    uuid institutionId FK
+    string name
+    string email UK
+    string passwordHash "NOT NULL, argon2id"
+    string passwordSalt "legacy, nullable"
+    timestamptz lastTokenIssuedAt
+    string role "loan_officer, underwriter, broker"
+    timestamptz createdAt
+  }
+  USER {
+    uuid id PK
+    string name
+    string email UK
+    string passwordHash "NOT NULL, argon2id"
+    timestamptz passwordSetAt "NULL while invited"
+    string passwordSalt "legacy, nullable"
+    timestamptz lastTokenIssuedAt
+    timestamptz createdAt
+  }
   PROPERTY {
     uuid id PK
+    uuid institutionId FK
     string address
+    decimal loanAmount "transitional, see LOAN"
+    decimal currentBalance "transitional, see LOAN"
+    decimal monthlyPayment "transitional, see LOAN"
+    bool dynamicBillingEnabled "transitional, see LOAN"
+    string status "pending_acknowledgement, active"
+    timestamptz createdAt
+  }
+  LOAN {
+    uuid id PK
+    uuid propertyId FK, UK
     decimal loanAmount
     decimal currentBalance
     decimal monthlyPayment
     bool dynamicBillingEnabled
+    timestamptz createdAt
   }
   PROPERTY_AGREEMENT {
     uuid id PK
@@ -34,30 +78,24 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     int noticeDays
     string valuationMethod
     string partialClaimMethod
-    timestamp effectiveAt
+    timestamptz effectiveAt
+  }
+  USER_PROPERTY {
+    uuid id PK
+    uuid userId FK
+    uuid propertyId FK
+    decimal maxOwnershipPercent
+    timestamptz createdAt
   }
   OWNER_ACKNOWLEDGEMENT {
     uuid id PK
     uuid agreementId FK
-    uuid userId FK
-    timestamp signedAt
-  }
-  USER {
-    uuid id PK
-    string name
-    string email
-  }
-  OWNERSHIP {
-    uuid id PK
-    uuid userId FK
-    uuid propertyId FK
-    decimal sharePct
-    decimal equityBalance
-    decimal maxOwnershipPct
+    uuid userPropertyId FK
+    timestamptz signedAt
   }
   PAYMENT_CYCLE {
     uuid id PK
-    uuid propertyId FK
+    uuid userPropertyId FK
     date dueDate
     decimal equityDue
     decimal interestDue
@@ -69,52 +107,67 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
   PAYMENT {
     uuid id PK
     uuid cycleId FK
-    uuid ownershipId FK
-    decimal amountDue
     decimal amountPaid
-    decimal overpayment
-    timestamp paidAt
+    timestamptz paidAt
   }
   EQUITY_LEDGER {
     uuid id PK
-    uuid ownershipId FK
+    uuid userPropertyId FK
     uuid cycleId FK
     decimal baseEquityDelta
     decimal bonusEquityDelta
     decimal runningBalance
-    timestamp createdAt
+    timestamptz createdAt
   }
   EQUITY_TRANSFER {
     uuid id PK
-    uuid propertyId FK
-    uuid sellerOwnershipId FK
+    uuid userPropertyId FK
     string status
     decimal askingPrice
-    decimal sharePct
-    timestamp noticeGivenAt
-    timestamp transferredAt
+    decimal sharePercent
+    timestamptz noticeGivenAt
+    timestamptz transferredAt
   }
   TRANSFER_CLAIM {
     uuid id PK
     uuid transferId FK
-    uuid buyerOwnershipId FK
-    decimal claimedPct
-    timestamp claimedAt
+    uuid userPropertyId FK
+    decimal claimedPercent
+    timestamptz claimedAt
   }
-  PROPERTY ||--|| PROPERTY_AGREEMENT : "governed by"
+  TOKEN_REVOCATION {
+    uuid id PK
+    uuid institutionUserId FK
+    timestamptz revokedAt
+    uuid revokedBy FK
+  }
+  AUTH_SECRET_STATE {
+    uuid id PK
+    string currentSecret
+    string previousSecret
+    timestamptz rotatedAt
+  }
+  RATE_LIMIT_HIT {
+    uuid id PK
+    string key "digest of scope, IP and email"
+    timestamptz expiresAt
+  }
+  INSTITUTION ||--o{ INSTITUTION_USER : "employs"
+  INSTITUTION ||--o{ PROPERTY : "owns book of"
+  INSTITUTION_USER ||--o{ TOKEN_REVOCATION : "revoked by"
+  PROPERTY ||--o| LOAN : "has"
+  PROPERTY ||--o| PROPERTY_AGREEMENT : "governed by"
   PROPERTY_AGREEMENT ||--o{ OWNER_ACKNOWLEDGEMENT : "signed by"
-  USER ||--o{ OWNER_ACKNOWLEDGEMENT : "signs"
-  USER ||--o{ OWNERSHIP : "holds"
-  PROPERTY ||--o{ OWNERSHIP : "has"
-  PROPERTY ||--o{ PAYMENT_CYCLE : "has"
-  OWNERSHIP ||--o{ PAYMENT : "makes"
+  USER ||--o{ USER_PROPERTY : "holds"
+  PROPERTY ||--o{ USER_PROPERTY : "has"
+  USER_PROPERTY ||--o{ OWNER_ACKNOWLEDGEMENT : "signs"
+  USER_PROPERTY ||--o{ PAYMENT_CYCLE : "owes"
   PAYMENT_CYCLE ||--o{ PAYMENT : "contains"
-  OWNERSHIP ||--o{ EQUITY_LEDGER : "tracks"
+  USER_PROPERTY ||--o{ EQUITY_LEDGER : "tracks"
   PAYMENT_CYCLE ||--o{ EQUITY_LEDGER : "generates"
-  PROPERTY ||--o{ EQUITY_TRANSFER : "has"
-  OWNERSHIP ||--o{ EQUITY_TRANSFER : "sold by"
+  USER_PROPERTY ||--o{ EQUITY_TRANSFER : "sold by"
   EQUITY_TRANSFER ||--o{ TRANSFER_CLAIM : "claimed via"
-  OWNERSHIP ||--o{ TRANSFER_CLAIM : "claimed by"
+  USER_PROPERTY ||--o{ TRANSFER_CLAIM : "claimed by"
 `);
 document.getElementById('erd').innerHTML = svg;
 document.querySelectorAll('#erd svg .node').forEach(node => {
