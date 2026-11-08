@@ -2,7 +2,7 @@ from uuid import UUID
 
 from app.models import InstitutionUser
 from app.services.auth import unusable_password_hash
-from tests.conftest import STRONG_PASSWORD, bearer
+from tests.conftest import bearer
 from tests.test_accept_invite import _invited
 from tests.test_listings import _buyer_token, _third_officer
 from tests.test_property_list import _second_officer
@@ -20,7 +20,6 @@ def _add(client, officer, name, email, role):
             "institutionId": officer["institution"]["id"],
             "name": name,
             "email": email,
-            "password": STRONG_PASSWORD,
             "role": role,
         },
         headers=bearer(officer["accessToken"]),
@@ -104,7 +103,6 @@ def test_creating_user_validates_role(client, officer):
             "institutionId": officer["institution"]["id"],
             "name": "Def",
             "email": "def@example.com",
-            "password": STRONG_PASSWORD,
         },
         headers=bearer(officer["accessToken"]),
     )

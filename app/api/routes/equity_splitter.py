@@ -27,6 +27,7 @@ from app.schemas.institution import (
     InstitutionCreate,
     InstitutionRead,
     InstitutionUserCreate,
+    InstitutionUserCreated,
     InstitutionUserRead,
     ProfessionalRole,
 )
@@ -43,11 +44,9 @@ from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
 from app.services.auth import (
-    hash_password,
+    issue_institution_invite_token,
     issue_invite_token,
-    now_utc_seconds,
     unusable_password_hash,
-    validate_password_policy,
 )
 
 router = APIRouter()
@@ -69,7 +68,7 @@ def create_institution(
     return institution
 
 
-@router.post("/institution-users", response_model=InstitutionUserRead, status_code=status.HTTP_201_CREATED)
+@router.post("/institution-users", response_model=InstitutionUserCreated, status_code=status.HTTP_201_CREATED)
 def create_institution_user(
     payload: InstitutionUserCreate,
     response: Response,
@@ -78,14 +77,13 @@ def create_institution_user(
 ):
     if principal.institution_id != payload.institutionId:
         raise HTTPException(status_code=403, detail="Loan officer not authorized for institution")
-    validate_password_policy(payload.password)
-    raw = payload.model_dump()
-    password = raw.pop("password")
-    inst_user = InstitutionUser(**raw, passwordHash=hash_password(password), passwordSetAt=now_utc_seconds())
+    inst_user = InstitutionUser(**payload.model_dump(), passwordHash=unusable_password_hash(), passwordSetAt=None)
     db.add(inst_user)
     db.commit()
     db.refresh(inst_user)
-    return inst_user
+    token = issue_institution_invite_token(db, inst_user.id)
+    read = InstitutionUserRead.model_validate(inst_user)
+    return InstitutionUserCreated(**read.model_dump(), activationToken=token, activationPath=f"/activate#token={token}")
 
 
 @router.get("/professionals", response_model=list[ProfessionalRead])

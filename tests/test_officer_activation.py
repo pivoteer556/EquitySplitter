@@ -90,24 +90,41 @@ def test_token_for_existing_officer_with_password_is_rejected(client, officer, s
     assert ok.status_code == 200
 
 
-def test_existing_creation_paths_mark_password_set(client, officer, session_factory):
+def test_bootstrap_officer_has_password_set_but_created_user_is_pending(client, officer, session_factory):
     from app.models import InstitutionUser
 
-    created = client.post(
-        f"{API}/institution-users",
-        json={
-            "institutionId": officer["institution"]["id"],
-            "name": "Second",
-            "email": "second@example.com",
-            "password": STRONG_PASSWORD,
-        },
-        headers={"Authorization": f"Bearer {officer['accessToken']}"},
-    )
+    created = _create(client, officer)
     assert created.status_code == 201, created.text
     db = session_factory()
-    rows = db.query(InstitutionUser).all()
-    assert len(rows) == 2 and all(r.passwordSetAt is not None for r in rows)
+    rows = {r.email: r for r in db.query(InstitutionUser).all()}
+    assert rows["casey@example.com"].passwordSetAt is not None
+    assert rows[EMAIL].passwordSetAt is None
     db.close()
+
+
+def _create(client, officer, **extra):
+    return client.post(
+        f"{API}/institution-users",
+        json={"institutionId": officer["institution"]["id"], "name": "Second", "email": EMAIL, **extra},
+        headers={"Authorization": f"Bearer {officer['accessToken']}"},
+    )
+
+
+def test_create_returns_activation_token_that_activates(client, officer):
+    created = _create(client, officer)
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["activationPath"] == f"/activate#token={body['activationToken']}"
+    assert "passwordHash" not in body and "password" not in body
+    assert _login(client).status_code == 401  # cannot log in before activation
+    assert _activate(client, body["activationToken"]).status_code == 200
+    assert _login(client).status_code == 200
+
+
+def test_create_rejects_a_password_field(client, officer):
+    resp = _create(client, officer, password=STRONG_PASSWORD)
+    assert resp.status_code == 422
+    assert _login(client, STRONG_PASSWORD).status_code == 401
 
 
 def test_expired_activation_token_is_rejected(client, officer, session_factory):

@@ -22,10 +22,13 @@ class InstitutionRead(BaseModel):
 
 
 class InstitutionUserCreate(BaseModel):
+    # Officers never choose a password: they activate through a one-time link. extra="forbid" makes a sent
+    # `password` a 422 rather than silently ignoring it (same convention as PropertyUpdate).
+    model_config = ConfigDict(extra="forbid")
+
     institutionId: UUID
     name: str
     email: EmailStr
-    password: str
     role: ProfessionalRole = "loan_officer"
 
 
@@ -38,3 +41,8 @@ class InstitutionUserRead(BaseModel):
     email: EmailStr
     role: str
     createdAt: datetime
+
+
+class InstitutionUserCreated(InstitutionUserRead):
+    activationToken: str
+    activationPath: str
