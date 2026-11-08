@@ -274,9 +274,7 @@ def get_property(
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     return {
         "property": PropertyRead.model_validate(prop).model_dump(),
-        "agreement": PropertyAgreementRead.model_validate(agreement).model_dump()
-        if agreement
-        else PropertyAgreementRead.model_validate({}).model_dump(),
+        "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else None,
     }
 
 
@@ -309,9 +307,7 @@ def list_owners(
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     if agreement is None:
-        return {
-            "owners": [PropertyOwnersRead.model_validate({}).model_dump()]
-        }  # return empty owner list if no agreement attached
+        return {"owners": []}  # no agreement attached, so nobody can have been invited yet
 
     rows = (
         db.query(UserProperty, User, OwnerAcknowledgement)
