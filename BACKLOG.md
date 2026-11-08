@@ -131,6 +131,15 @@ User statement: loan officer passwords should not be a thing; the system chooses
 5. Docs: Feature 2 spec (credentials, onboarding), schema page.
 Open: until email exists the link is shown on screen / returned by the API and passed on out of band. Starts after the connection-request backend lands (same files).
 
+## 2g. Bootstrap gated by an environment secret (user decision 2026-11-08)
+
+Context: `POST /auth/institution/bootstrap` is open to anyone on the internet (only rate-limited). Decision: "Admin gated by environment secret". Plan, after 2f step 3 (same route), one commit each, docs/specs updated with each:
+
+1. Bootstrap requires header `X-Bootstrap-Token` equal to env `BOOTSTRAP_TOKEN` (constant-time compare). If the env var is unset the endpoint is disabled (identical 404/403 for everyone). Wrong or missing token gets the same generic error and counts against the rate limit.
+2. Infra (the user runs `terraform apply`): generate the secret in `infra/identity.tf`, store it in Key Vault, pass it to the Container App as a secret env var. Ask before anything touching Azure.
+3. Frontend: bootstrap form gets a "setup token" field and sends the header; e2e global-setup passes the token.
+Open: should bootstrap also close itself once any institution exists (single-tenant) or stay available per pilot institution? Current assumption: stays available, gated by the token, because each pilot institution is created this way.
+
 ## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).
