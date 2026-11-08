@@ -86,6 +86,18 @@ Progress and rules (user answer 2026-11-07: a property is removed only when an o
 - Owner split of an ACTIVE property: needs all owners' consent, ends in a `dissolved` status and keeps history. **Blocked on the user:** what a split means for the loan (end co-ownership only, or separate properties/loans).
 - ~~Gap found: `GET /properties/{id}` and `/owners` accept user tokens only; officers cannot read a single property. Add the dual dependency plus an institution check.~~ **Done** (this commit): officers read their own institution's property and owners list; another institution's property returns 404, identical to a nonexistent id. Minor leftover: an UNLINKED OWNER still gets 403 (not 404) for an existing property, so owners can probe for existing ids (UUIDs, low risk); the existing test pins that 403.
 
+## 2e. Marketplace: buyers browse pending properties and connect with professionals (user direction 2026-11-07)
+
+User statement: officers should be able to look at any pending property; any potential buyer could do that; buyers get connected with loan officers (LO), underwriters (UW) and brokers to get the house bought. This REVERSES the strict institution isolation built in 2d for PENDING properties only (active properties stay institution-scoped). My understanding, to be confirmed:
+
+- Buyers are ordinary `User`s (self-register via `/register`); pending properties act as listings.
+- LO / UW / broker are `role` values on institution users (today a free-text `role`, default `loan_officer`).
+- A buyer sends a connection request to a professional about a property; the professional accepts or declines (new entity, e.g. `ConnectionRequest`: buyer, professional, property, status).
+
+Decisions needed before building: (1) which property fields a buyer or other-institution officer may see on a pending property (owners' names/emails and the agreement stay private; the seller's current balance and monthly payment are sensitive); (2) whether all three roles are institution users and whether buyers get a directory of professionals; (3) how a connection works (request/accept, officer assignment, or both).
+
+Then, one run each: a role vocabulary check; a public pending-listing endpoint with a restricted response schema (and tests that no private field leaks); a professionals directory; the ConnectionRequest model + migration + endpoints; UI for each.
+
 ## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).
