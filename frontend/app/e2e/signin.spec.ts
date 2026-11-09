@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { PLATFORM_ADMIN_EMAIL, PLATFORM_ADMIN_PASSWORD } from './global-setup';
-import { alertBox, countLoginCalls, expectNoSession, fill, LOGIN_API, makeUser } from './helpers';
+import { alertBox, countLoginCalls, countRequests, expectNoSession, fill, LOGIN_API, makeTotpOfficer, makeUser, totpCode } from './helpers';
 
 // Adversarial suite for Sign In, run against the REAL backend (throwaway database `equity_e2e`).
 // Only tests labelled "fault injection" intercept /api/v1: they simulate failures a healthy backend
@@ -444,4 +444,40 @@ test('brand header shows on /login and on another route (/accept-invite)', async
   await expect(header.getByRole('img', { name: 'EquitySplitter' })).toBeVisible();
   await page.goto('/accept-invite');
   await expect(header).toBeVisible();
+});
+
+test('an officer with an authenticator: password alone, then a wrong code, store nothing; only the right next code signs in', async ({ page }) => {
+  const officer = await makeTotpOfficer('totp');
+  const totpCalls = countRequests(page, '/auth/login/totp');
+  const loginCalls = countLoginCalls(page);
+  const tokens = () => page.evaluate(() => [localStorage.getItem('institutionToken'), localStorage.getItem('userToken')]);
+
+  await fill(page, officer.email, officer.password);
+  const first = page.waitForResponse(LOGIN_API);
+  await loginButton(page).click();
+  expect((await (await first).json()).secondFactorRequired).toBe(true);
+  await expect(page.locator('#login-code')).toBeVisible();
+  expect(await tokens()).toEqual([null, null]);
+  expect(new URL(page.url()).pathname).toBe('/login');
+  expect(totpCalls.count()).toBe(0);
+
+  // Wrong code: any 6 digits that are not valid in the accepted window.
+  const valid = [-2, -1, 0, 1, 2].map((o) => totpCode(officer.secret, o));
+  const wrong = ['000000', '111111', '222222'].find((c) => !valid.includes(c))!;
+  await page.locator('#login-code').fill(wrong);
+  const bad = page.waitForResponse('**/api/v1/auth/login/totp');
+  await page.getByRole('button', { name: 'Verify' }).click();
+  expect((await bad).status()).toBe(401);
+  await expect(alertBox(page)).toBeVisible();
+  expect(totpCalls.count()).toBe(1); // proves the counter sees real code submissions
+  expect(await tokens()).toEqual([null, null]);
+  expect(new URL(page.url()).pathname).toBe('/login');
+
+  // The code that confirmed enrolment is spent, so use the next 30 s step (inside the server's +/-1 window).
+  await page.locator('#login-code').fill(totpCode(officer.secret, 1));
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(page).toHaveURL(/\/workbench$/);
+  expect(totpCalls.count()).toBe(2);
+  expect(loginCalls.count()).toBe(1); // the password was sent once; the code step did not resend it
+  expect((await tokens())[0]).toBeTruthy();
 });

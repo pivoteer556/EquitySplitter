@@ -37,6 +37,17 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   `/auth/accept-invite` uses the same limit (10 attempts per hour per IP, every attempt counted) but with its own
   per-IP budget, separate from register/bootstrap. These are per-IP application-level throttles against guessing and
   abuse, not DDoS protection; volumetric attacks must be absorbed at the edge (e.g. Azure Front Door / WAF).
+- **Second sign-in step (officers with a confirmed authenticator)** — when an officer who has a confirmed TOTP credential
+  passes the password check, `POST /auth/login` returns `{userType: "institution_user", secondFactorRequired: true,
+  challengeToken}` instead of an access token. `POST /auth/login/totp` takes `{challengeToken, code}` (6 digits) and
+  returns the normal login response. The challenge is a stateless HS256 JWT (`userType` `login_challenge`, 5 minutes)
+  that every auth dependency rejects, so it cannot be used as an access token. A wrong or replayed code, or a bad or
+  expired challenge, is `401 Invalid credentials`; a malformed code is 422. Failures count in the same `login` bucket as
+  the password step (5 per 60 s per IP+email), and a correct password on such an officer does NOT reset that counter,
+  only a finished sign-in does. Replay protection is the credential's `lastUsedStep`. Known limits: the challenge token
+  is not single-use (the code is); officers with no confirmed credential still sign in on the password alone (the
+  required enrolment at first sign-in is planned, BACKLOG 2l); users and owners have no credential yet; recovery codes,
+  reset and an enrolment UI are planned.
 - **CORS** — `http://localhost:4200` and `http://127.0.0.1:4200` are always allowed. Set `CORS_ALLOW_ORIGINS` to a
   comma-separated list of extra origins (e.g. `https://site.example.net,https://other.example`) to allow a deployed
   frontend. Whitespace, empty entries, trailing slashes and `*` are ignored.

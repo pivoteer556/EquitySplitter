@@ -16,6 +16,7 @@ import {
   PropertyAgreement,
   PropertyDetailResponse,
   PropertyOwnersResponse,
+  SecondFactorChallenge,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -57,17 +58,26 @@ export class ApiService {
   }
 
   /** One sign-in for every account; userType in the response decides which stored token (officer or user) it becomes. */
-  login(email: string, password: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login`, { email, password }).pipe(
+  login(email: string, password: string): Observable<LoginResponse | SecondFactorChallenge> {
+    return this.http.post<LoginResponse | SecondFactorChallenge>(`${this.baseUrl}/auth/login`, { email, password }).pipe(
       tap((res) => {
-        if (res.userType === 'institution_user') {
-          this.setInstitutionToken(res.accessToken);
-          this.setInstitutionId(res.institutionId ?? '');
-        } else {
-          this.setUserToken(res.accessToken);
-        }
+        if (!('secondFactorRequired' in res)) this.storeLogin(res); // a challenge is not a session: store nothing
       }),
     );
+  }
+
+  /** Second sign-in step for an officer with an authenticator; stores the session exactly as login does. */
+  loginTotp(challengeToken: string, code: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login/totp`, { challengeToken, code }).pipe(tap((res) => this.storeLogin(res)));
+  }
+
+  private storeLogin(res: LoginResponse): void {
+    if (res.userType === 'institution_user') {
+      this.setInstitutionToken(res.accessToken);
+      this.setInstitutionId(res.institutionId ?? '');
+    } else {
+      this.setUserToken(res.accessToken);
+    }
   }
 
   ownerRegister(payload: { name: string; email: string; password: string }): Observable<AuthTokenResponse> {

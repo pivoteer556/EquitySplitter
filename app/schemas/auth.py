@@ -2,7 +2,7 @@ import re
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
 
@@ -49,6 +49,20 @@ class LoginResponse(AuthTokenResponse):
     isPlatformAdmin: bool
     role: str | None = None
     institutionId: UUID | None = None
+
+
+class SecondFactorChallenge(BaseModel):
+    """Returned by POST /auth/login instead of a token when the officer has a confirmed authenticator. The
+    challengeToken only works at POST /auth/login/totp."""
+
+    userType: Literal["institution_user"] = "institution_user"
+    secondFactorRequired: Literal[True] = True
+    challengeToken: str
+
+
+class LoginTotpRequest(BaseModel):
+    challengeToken: str
+    code: str = Field(pattern=r"^\d{6}$")
 
 
 class AcceptInviteRequest(BaseModel):

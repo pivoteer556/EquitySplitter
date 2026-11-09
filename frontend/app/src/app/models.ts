@@ -73,6 +73,13 @@ export interface LoginResponse extends AuthTokenResponse {
   institutionId: string | null;
 }
 
+/** POST /auth/login answer for an officer with an authenticator: no token yet, only a challenge for POST /auth/login/totp. */
+export interface SecondFactorChallenge {
+  userType: 'institution_user';
+  secondFactorRequired: true;
+  challengeToken: string;
+}
+
 export interface InstitutionBootstrapResponse {
   institution: Institution;
   institutionUser: InstitutionUser;

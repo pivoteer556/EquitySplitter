@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { expect, Page, Request } from '@playwright/test';
 import { activate, ADMIN_EMAIL, ADMIN_PASSWORD, API } from './global-setup';
 
@@ -83,6 +84,15 @@ export function countLoginCalls(page: Page): { count: () => number } {
   return { count: () => n };
 }
 
+/** Counts POSTs whose URL ends with `suffix`. */
+export function countRequests(page: Page, suffix: string): { count: () => number } {
+  let n = 0;
+  page.on('request', (r: Request) => {
+    if (r.method() === 'POST' && r.url().endsWith(suffix)) n++;
+  });
+  return { count: () => n };
+}
+
 export async function fill(page: Page, email: string, password: string): Promise<void> {
   await page.locator('#login-email').fill(email);
   await page.locator('#login-password').fill(password);
@@ -93,4 +103,35 @@ export const alertBox = (page: Page) => page.getByRole('alert');
 export async function expectNoSession(page: Page): Promise<void> {
   expect(await page.evaluate(() => localStorage.getItem('institutionToken'))).toBeNull();
   expect(new URL(page.url()).pathname).toBe('/login');
+}
+
+/** RFC 6238 (SHA-1, 6 digits, 30 s) from a base32 secret, for the step `offset` steps from now. Uses node crypto only. */
+export function totpCode(secretBase32: string, offset = 0): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const ch of secretBase32.replace(/=+$/, '').toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, '0');
+  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000) + offset));
+  const mac = createHmac('sha1', key).update(counter).digest();
+  const o = mac[mac.length - 1] & 0x0f;
+  return String((mac.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+/** Makes an officer and enrols + confirms TOTP through the real API. Returns the secret. The confirming code is spent. */
+export async function makeTotpOfficer(tag: string): Promise<TestUser & { secret: string }> {
+  const user = await makeUser(tag);
+  const login = await fetch(`${API}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(user),
+  });
+  const { accessToken } = await login.json(); // no credential yet, so this is still a plain token
+  const auth = { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` };
+  const enroll = await fetch(`${API}/auth/institution/totp/enroll`, { method: 'POST', headers: auth });
+  if (enroll.status !== 200) throw new Error(`enroll failed: ${enroll.status}`);
+  const { secret } = await enroll.json();
+  const confirm = await fetch(`${API}/auth/institution/totp/confirm`, { method: 'POST', headers: auth, body: JSON.stringify({ code: totpCode(secret) }) });
+  if (confirm.status !== 204) throw new Error(`confirm failed: ${confirm.status} ${await confirm.text()}`);
+  return { ...user, secret };
 }

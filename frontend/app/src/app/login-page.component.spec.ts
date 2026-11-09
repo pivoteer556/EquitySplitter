@@ -201,6 +201,66 @@ describe('LoginPageComponent', () => {
     });
   });
 
+  describe('second factor', () => {
+    const CHALLENGE = { userType: 'institution_user', secondFactorRequired: true, challengeToken: 'chal' };
+    const OFFICER = { userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'i1' };
+    function twoStep(totpErr?: unknown) {
+      const totpCalls: string[][] = [];
+      const api = {
+        login: () => of(CHALLENGE),
+        loginTotp: (t: string, c: string) => {
+          totpCalls.push([t, c]);
+          return totpErr === undefined ? of(OFFICER) : throwError(() => totpErr);
+        },
+      };
+      TestBed.configureTestingModule({ imports: [LoginPageComponent], providers: [{ provide: ApiService, useValue: api }, provideRouter([])] });
+      const fixture = TestBed.createComponent(LoginPageComponent);
+      fixture.detectChanges();
+      const nav = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+      const c = fixture.componentInstance;
+      c.loginEmail = 'o@b.com';
+      c.loginPassword = 'pw';
+      c.login();
+      fixture.detectChanges();
+      return { fixture, nav, totpCalls, c };
+    }
+    const codeInput = (f: { nativeElement: unknown }) => (f.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#login-code');
+
+    it('shows no code field before a challenge', () => {
+      const fixture = setup(undefined);
+      expect(codeInput(fixture)).toBeNull();
+    });
+
+    it('a password-only result shows a 6-digit one-time-code field and does not navigate', () => {
+      const { fixture, nav } = twoStep();
+      const input = codeInput(fixture)!;
+      expect(input).toBeTruthy();
+      expect(input.getAttribute('inputmode')).toBe('numeric');
+      expect(input.getAttribute('autocomplete')).toBe('one-time-code');
+      expect(input.getAttribute('pattern')).toBe('[0-9]{6}');
+      expect(input.required).toBeTrue();
+      expect(nav).not.toHaveBeenCalled();
+    });
+
+    it('submitting the code sends the challenge and goes to /workbench', () => {
+      const { c, nav, totpCalls, fixture } = twoStep();
+      c.loginCode = '123456';
+      c.submitCode();
+      fixture.detectChanges();
+      expect(totpCalls).toEqual([['chal', '123456']]);
+      expect(nav).toHaveBeenCalledWith('/workbench');
+    });
+
+    it('a wrong code shows a code-specific message and does not navigate', () => {
+      const { c, nav, fixture } = twoStep({ status: 401 });
+      c.loginCode = '000000';
+      c.submitCode();
+      fixture.detectChanges();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.error')?.textContent?.trim()).toBe('Incorrect or expired code. Check your authenticator app and try again.');
+      expect(nav).not.toHaveBeenCalled();
+    });
+  });
+
   describe('create account (owner sign-up, same as the old /buyer form)', () => {
     it('submits name, email and password to ownerRegister and goes to /listings', async () => {
       const registerCalls: unknown[] = [];

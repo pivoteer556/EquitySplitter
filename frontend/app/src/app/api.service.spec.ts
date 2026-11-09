@@ -33,6 +33,36 @@ describe('ApiService base URL', () => {
     http.verify();
   });
 
+  it('login with a second-factor challenge stores no token and returns the challenge', () => {
+    const { api, http } = loginSetup();
+    let result: unknown;
+
+    api.login('o@b.c', 'x').subscribe((r) => (result = r));
+
+    http.expectOne(`${environment.apiBaseUrl}/auth/login`).flush({ userType: 'institution_user', secondFactorRequired: true, challengeToken: 'chal' });
+    expect(api.getInstitutionToken()).toBe('');
+    expect(api.getUserToken()).toBe('');
+    expect(api.getInstitutionId()).toBe('');
+    expect((result as { challengeToken: string }).challengeToken).toBe('chal');
+    http.verify();
+  });
+
+  it('loginTotp posts the challenge and code, then stores the officer token like login does', () => {
+    const { api, http } = loginSetup();
+
+    api.loginTotp('chal', '123456').subscribe();
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/auth/login/totp`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ challengeToken: 'chal', code: '123456' });
+    req.flush({ accessToken: 'officer-jwt', tokenType: 'Bearer', userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'inst-9' });
+    expect(api.getInstitutionToken()).toBe('officer-jwt');
+    expect(api.getInstitutionId()).toBe('inst-9');
+    api.clearTokens();
+    api.setInstitutionId('');
+    http.verify();
+  });
+
   it('login stores an institution_user as the officer token and institution id, not the user token', () => {
     const { api, http } = loginSetup();
 

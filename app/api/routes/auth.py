@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps.auth import Principal, platform_admin_principal, require_institution_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import InstitutionUser, TokenRevocation, User
+from app.models import InstitutionUser, TokenRevocation, TotpCredential, User
 from app.schemas.auth import (
     AcceptInviteRequest,
     AuthLoginRequest,
@@ -19,14 +19,19 @@ from app.schemas.auth import (
     InstitutionBootstrapResponse,
     InstitutionRevokeRequest,
     LoginResponse,
+    LoginTotpRequest,
+    SecondFactorChallenge,
 )
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
+from app.services import totp
 from app.services.auth import (
     accept_invite,
     activate_institution_user,
     bootstrap_institution,
     burn_password_check,
+    decode_token,
     hash_password,
+    issue_login_challenge_token,
     now_utc_seconds,
     refresh_and_store_institution_token,
     refresh_and_store_user_token,
@@ -150,13 +155,25 @@ def _authenticate(db: Session, email: str, password: str) -> User | InstitutionU
     return None
 
 
-@router.post("/login", response_model=LoginResponse)
+def _confirmed_credential(db: Session, officer_id: UUID) -> TotpCredential | None:
+    return (
+        db.query(TotpCredential)
+        .filter(TotpCredential.institutionUserId == officer_id, TotpCredential.confirmedAt.is_not(None))
+        .first()
+    )
+
+
+@router.post("/login", response_model=LoginResponse | SecondFactorChallenge)
 def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
     key = _login_key("login", request, payload.email)  # one budget per ip+email, whichever kind of account it is
     _enforce_login_limit(db, key)
     account = _authenticate(db, payload.email, payload.password)
     if account is None:
         _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")  # one failure counts once
+    if isinstance(account, InstitutionUser) and _confirmed_credential(db, account.id) is not None:
+        # Password proven, session not issued yet. The budget is NOT reset here: only a finished sign-in clears it,
+        # so a stolen password cannot be used to keep wiping the counter while guessing codes.
+        return SecondFactorChallenge(challengeToken=issue_login_challenge_token(db, account.id))
     login_limiter.reset(db, key)
     if isinstance(account, InstitutionUser):
         return LoginResponse(
@@ -170,6 +187,46 @@ def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get
         accessToken=refresh_and_store_user_token(db, account),
         userType="user",
         isPlatformAdmin=account.isPlatformAdmin,
+    )
+
+
+@router.post("/login/totp", response_model=LoginResponse)
+def login_totp(payload: LoginTotpRequest, request: Request, db: Session = Depends(get_db)):
+    """Second sign-in step. Every failure is the same 401 as a bad password and counts toward the same "login"
+    budget (keyed by ip+email, so the password step and the code step share one limit)."""
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    try:
+        claims = decode_token(db, payload.challengeToken)
+    except HTTPException:
+        raise invalid from None
+    # decode_token cannot tell token types apart: an access token must not pass as a challenge.
+    officer = None
+    if claims.get("userType") == "login_challenge":
+        try:
+            officer = db.get(InstitutionUser, UUID(claims["sub"]))
+        except (KeyError, ValueError):
+            officer = None
+    if officer is None:
+        # A forged challenge is impossible (signed) so there is no email to charge; nothing to count against.
+        raise invalid
+    key = _login_key("login", request, officer.email)
+    _enforce_login_limit(db, key)
+    credential = _confirmed_credential(db, officer.id)
+    step = None
+    if credential is not None:
+        step = totp.verify_code(
+            totp.decrypt_secret(credential.secretEncrypted), payload.code, now_utc_seconds(), credential.lastUsedStep
+        )
+    if credential is None or step is None:
+        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    credential.lastUsedStep = step  # single use: the same or an older code is a replay next time
+    login_limiter.reset(db, key)
+    return LoginResponse(
+        accessToken=refresh_and_store_institution_token(db, officer),  # commits lastUsedStep with the session iat
+        userType="institution_user",
+        isPlatformAdmin=False,
+        role=officer.role,
+        institutionId=officer.institutionId,
     )
 
 

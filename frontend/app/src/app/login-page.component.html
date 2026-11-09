@@ -7,6 +7,14 @@
 
   <section>
     <h2>Sign In</h2>
+    @if (challengeToken) {
+    <form id="code-form" (ngSubmit)="submitCode()" ngNativeValidate>
+      <label for="login-code">Authenticator code</label>
+      <input id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" required
+        pattern="[0-9]{6}" maxlength="6" title="The 6-digit code from your authenticator app." [(ngModel)]="loginCode" />
+      <button type="submit" [disabled]="loading">{{ loading ? 'Signing in...' : 'Verify' }}</button>
+    </form>
+    } @else {
     <form id="signin-form" (ngSubmit)="login()" ngNativeValidate>
       <label for="login-email">Email</label>
       <input id="login-email" name="email" type="email" autocomplete="username" required [(ngModel)]="loginEmail" />
@@ -14,6 +22,7 @@
       <input id="login-password" name="password" type="password" autocomplete="current-password" required [(ngModel)]="loginPassword" />
       <button type="submit" [disabled]="loading">{{ loading ? 'Signing in...' : 'Login' }}</button>
     </form>
+    }
   </section>
 
   <details>

@@ -18,6 +18,7 @@ from app.models import AuthSecretState, Institution, InstitutionUser, TokenRevoc
 PASSWORD_POLICY = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$")
 
 INVITE_TOKEN_DAYS = 7
+LOGIN_CHALLENGE_MINUTES = 5
 
 
 def now_utc_seconds() -> datetime:
@@ -126,6 +127,20 @@ def issue_institution_invite_token(db: Session, institution_user_id: UUID) -> st
         "userType": "institution_invite",
         "iat": int(iat_dt.timestamp()),
         "exp": int((iat_dt + timedelta(days=INVITE_TOKEN_DAYS)).timestamp()),
+    }
+    return jwt.encode(claims, ensure_secret_state(db).currentSecret, algorithm="HS256")
+
+
+def issue_login_challenge_token(db: Session, institution_user_id: UUID) -> str:
+    """Stateless proof that the password step passed, redeemable only at POST /auth/login/totp. userType=
+    "login_challenge" keeps it out of every auth dependency (they accept only user/institution_user). It is not
+    single-use by itself: the one-time TOTP code is what cannot be replayed, and wrong codes are rate limited."""
+    iat_dt = now_utc_seconds()
+    claims = {
+        "sub": str(institution_user_id),
+        "userType": "login_challenge",
+        "iat": int(iat_dt.timestamp()),
+        "exp": int((iat_dt + timedelta(minutes=LOGIN_CHALLENGE_MINUTES)).timestamp()),
     }
     return jwt.encode(claims, ensure_secret_state(db).currentSecret, algorithm="HS256")
 
