@@ -39,11 +39,11 @@ describe('LoginPageComponent', () => {
     expect(getComputedStyle(root.querySelector('h1')!).color).toBe('rgb(20, 33, 61)'); // --brand-navy #14213D
   });
 
-  it('draws the card as a white surface with a pale blue border, distinct from the page tint', () => {
+  it('draws the card as a cream surface with an amber border, distinct from the night page', () => {
     const root = setup(undefined).nativeElement as HTMLElement;
     const card = getComputedStyle(root.querySelector('.login-shell')!);
-    expect(card.backgroundColor).toBe('rgb(255, 255, 255)'); // --brand-surface
-    expect(card.borderTopColor).toBe('rgb(201, 214, 238)'); // --brand-border #C9D6EE
+    expect(card.backgroundColor).toBe('rgb(248, 237, 203)'); // --brand-surface #F8EDCB
+    expect(card.borderTopColor).toBe('rgb(217, 185, 106)'); // --brand-border #D9B96A
     expect(card.backgroundColor).not.toBe(getComputedStyle(document.body).backgroundColor);
   });
 

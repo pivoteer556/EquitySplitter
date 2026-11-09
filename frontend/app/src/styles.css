@@ -1,6 +1,6 @@
 /* You can add global styles to this file, and also import other style files */
 
-/* Brand palette (docs/design/README.md). Light backgrounds only; no dark-mode variant yet. */
+/* Brand palette (docs/design/README.md). Page is night, cards are cream; no dark-mode media variant yet. */
 :root {
   --brand-navy: #14213D;
   --brand-blue: #3A5FB0;
@@ -10,25 +10,41 @@
      so no extra darkening of the blue was needed beyond the hover shade. */
   --brand-blue-dark: #2A4688;
   --brand-tint: #F4F7FC;
-  /* Cards/panels sit on white with a pale blue border so they lift off the --brand-tint page.
-     Contrast: navy on surface 16.0:1, navy on tint 14.9:1; surface vs tint 1.07:1 and border vs tint 1.36:1 (edges, not text,
-     so the 1px border plus --brand-shadow carries the separation). */
-  --brand-surface: #FFFFFF;
-  --brand-border: #C9D6EE;
-  --brand-shadow: 0 1px 3px rgba(20, 33, 61, 0.1);
+  /* Campfire night: a deep night page with firelit cream cards. Computed WCAG contrast:
+     --brand-on-dark #E9EDF5 on --brand-night 15.4:1, --brand-link-on-dark #7FA3E6 on night 7.1:1,
+     navy on --brand-surface (cream) 13.7:1, --brand-blue link on cream 5.2:1, white on blue button 6.1:1 (unchanged).
+     Edges: cream vs night 15.5:1, --brand-border vs night 9.6:1, border vs cream 1.6:1 (carried with the shadow).
+     Amber focus ring: 8.4:1 on night but only 1.8:1 on cream (known gap; was ~2:1 on white). */
+  --brand-night: #0E1626;
+  --brand-on-dark: #E9EDF5;
+  --brand-link-on-dark: #7FA3E6;
+  --brand-surface: #F8EDCB;
+  --brand-border: #D9B96A;
+  --brand-shadow: 0 2px 10px rgba(224, 168, 0, 0.18);
   --brand-font: "Bricolage Grotesque", sans-serif;
 }
 
 body {
-  background: var(--brand-tint);
-}
-
-h1,
-h2 {
-  color: var(--brand-navy);
+  background: var(--brand-night);
+  color: var(--brand-on-dark);
 }
 
 a {
+  color: var(--brand-link-on-dark);
+}
+
+/* Cards and panels are cream: their text stays navy and links stay brand blue. */
+.login-shell,
+.invite-shell,
+.activate-shell,
+section {
+  color: var(--brand-navy);
+}
+
+.login-shell a,
+.invite-shell a,
+.activate-shell a,
+section a {
   color: var(--brand-blue);
 }
 

@@ -66,7 +66,7 @@ pre {
   border-bottom: 2px solid var(--brand-amber);
   font-family: var(--brand-font);
   font-size: 1.5rem;
-  color: var(--brand-navy);
+  color: var(--brand-on-dark);
 }
 
 .brand-equity {
@@ -78,11 +78,12 @@ pre {
 }
 
 .share-navy {
-  fill: var(--brand-navy);
+  fill: var(--brand-on-dark);
 }
 
 .share-blue {
-  fill: var(--brand-blue);
+  /* #3A5FB0 on night is 2.96:1, just under the 3:1 graphics guideline; the on-dark blue is 7.1:1. */
+  fill: var(--brand-link-on-dark);
 }
 
 .share-amber {
