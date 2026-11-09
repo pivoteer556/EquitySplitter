@@ -17,14 +17,6 @@ test('officer invites an owner: no password input, link shown, token not echoed,
   page,
   browser,
 }) => {
-  // WORKAROUND for a separate, pre-existing bug: the API does not list X-Refreshed-Token in CORS expose_headers, so
-  // the browser (page on :4200, API on :8000) never sees the rotated token, keeps the login token, and gets
-  // "401 Token no longer active" once a request lands in a later second than the login. Expose the header here so
-  // this test checks only the invite flow. Remove once the backend exposes it.
-  await page.route('**/api/v1/**', async (route) => {
-    const res = await route.fetch();
-    await route.fulfill({ response: res, headers: { ...res.headers(), 'access-control-expose-headers': 'X-Refreshed-Token' } });
-  });
   await signInOfficer(page);
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
 

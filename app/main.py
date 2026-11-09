@@ -67,6 +67,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins(settings.cors_allow_origins),
     allow_credentials=True,
+    expose_headers=["X-Refreshed-Token"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

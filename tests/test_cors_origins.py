@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
+from app.main import app as real_app
 from app.main import cors_origins
 
 LOCAL = ["http://localhost:4200", "http://127.0.0.1:4200"]
@@ -36,3 +37,8 @@ def test_preflight_allows_configured_and_localhost_origins_only():
     assert _preflight("https://site.example.net").headers["access-control-allow-origin"] == "https://site.example.net"
     assert _preflight("http://localhost:4200").headers["access-control-allow-origin"] == "http://localhost:4200"
     assert "access-control-allow-origin" not in _preflight("https://evil.example").headers
+
+
+def test_real_app_exposes_refreshed_token_header_to_allowed_origin():
+    response = TestClient(real_app).get("/health", headers={"Origin": "http://localhost:4200"})
+    assert "X-Refreshed-Token" in response.headers["access-control-expose-headers"]
