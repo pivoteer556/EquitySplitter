@@ -29,7 +29,7 @@ export class WorkbenchPageComponent {
 
   ownerName = '';
   ownerEmail = '';
-  ownerPassword = '';
+  inviteLink = '';
   maxOwnershipPercent: number | null = null;
 
   propertyStatus = '';
@@ -69,32 +69,6 @@ export class WorkbenchPageComponent {
     this.institutionId = this.api.getInstitutionId();
   }
 
-  registerOwner(): void {
-    this.clearMessages();
-    this.api.ownerRegister({
-      name: this.ownerName,
-      email: this.ownerEmail,
-      password: this.ownerPassword,
-    }).subscribe({
-      next: (res) => {
-        this.userToken = res.accessToken;
-        this.lastResponse = JSON.stringify(res, null, 2);
-      },
-      error: (err) => this.setError(err),
-    });
-  }
-
-  loginOwner(): void {
-    this.clearMessages();
-    this.api.ownerLogin(this.ownerEmail, this.ownerPassword).subscribe({
-      next: (res) => {
-        this.userToken = res.accessToken;
-        this.lastResponse = JSON.stringify(res, null, 2);
-      },
-      error: (err) => this.setError(err),
-    });
-  }
-
   createProperty(): void {
     this.clearMessages();
     this.api.createProperty({
@@ -131,13 +105,16 @@ export class WorkbenchPageComponent {
 
   inviteOwner(): void {
     this.clearMessages();
+    this.inviteLink = '';
     this.api.inviteOwner(this.propertyId, {
       name: this.ownerName,
       email: this.ownerEmail,
       maxOwnershipPercent: this.maxOwnershipPercent,
     }).subscribe({
       next: (res) => {
-        this.lastResponse = JSON.stringify(res, null, 2);
+        const { inviteToken, ...rest } = res;
+        this.inviteLink = inviteToken ? `${window.location.origin}/accept-invite#token=${inviteToken}` : '';
+        this.lastResponse = JSON.stringify(rest, null, 2);
         this.refreshOwners();
       },
       error: (err) => this.setError(err),

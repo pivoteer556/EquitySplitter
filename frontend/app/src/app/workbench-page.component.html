@@ -26,16 +26,6 @@
   </section>
 
   <section>
-    <h2>Owner Access</h2>
-    <input [(ngModel)]="ownerName" placeholder="Owner name" />
-    <input [(ngModel)]="ownerEmail" placeholder="Owner email" />
-    <input [(ngModel)]="ownerPassword" type="password" placeholder="Owner password" />
-    <button (click)="registerOwner()" [disabled]="!ownerName || !ownerEmail || !ownerPassword">Register Owner</button>
-    <button (click)="loginOwner()" [disabled]="!ownerEmail || !ownerPassword">Login Owner</button>
-    <div class="meta">Owner token is required for acknowledge.</div>
-  </section>
-
-  <section>
     <h2>Create Property</h2>
     <input [(ngModel)]="institutionId" placeholder="Institution ID" />
     <input [(ngModel)]="propertyAddress" placeholder="Address" />
@@ -68,12 +58,16 @@
     <input [(ngModel)]="ownerEmail" placeholder="Owner email" />
     <input type="number" [(ngModel)]="maxOwnershipPercent" placeholder="Max ownership percent" />
     <button (click)="inviteOwner()" [disabled]="!propertyId">Invite Owner</button>
+    @if (inviteLink) {
+      <div class="meta">Send this one-time link to the owner; they choose their own password there:</div>
+      <pre id="invite-link">{{ inviteLink }}</pre>
+    }
   </section>
 
   <section>
     <h2>Acknowledge</h2>
     <button (click)="acknowledgeAsOwner()" [disabled]="!propertyId || !userToken">Acknowledge as Owner</button>
-    <div class="meta">Sign in as the owner first, then acknowledge the agreement.</div>
+    <div class="meta">The owner signs in through the invite link first, then acknowledges the agreement.</div>
   </section>
 
   <section>

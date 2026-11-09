@@ -39,6 +39,7 @@ export interface Acknowledgement {
   agreementId: string;
   userPropertyId: string;
   signedAt: string | null;
+  inviteToken?: string | null;
 }
 
 export interface PropertyOwnerStatus {
