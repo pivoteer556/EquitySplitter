@@ -174,6 +174,24 @@ Why: a leaked password must not be enough to sign in, and with one login across 
 
 Story (user): someone sets up their employer on EquitySplitter, leaves, joins another employer and sets that one up too. Today `institutionUsers.email` is unique platform-wide, so the second bootstrap fails with 409. Decisions: one login (one email, one password) works for all of a person's institutions; this is standard (Slack, GitHub orgs) and not insecure by itself. Security notes: the access token stays scoped to ONE institution (chosen at sign-in, so a token never spans institutions), and the password only protects what the person already has access to; one stolen password exposes all their institutions, which is the case for MFA later. Bootstrapping with an email that already exists: the setup token is enough (user, 2026-11-08); the existing person gets a new membership and signs in with their existing password, no new password is made. Planned shape (recommended, nothing built, awaiting the user's go): separate the identity (email, password, `passwordSetAt`) from the membership (institution, role); `POST /auth/institution/login` returns the institutions the person belongs to when more than one and the client picks one; bootstrap with an existing email adds a membership; officer invites to an existing email do the same. ORDER (user, 2026-11-08): two-factor authentication (2l) is raised in priority and comes BEFORE these steps, because one login across institutions widens what a leaked password exposes. Steps, one commit each with docs/specs updated: 1. schema and migration (identity table plus membership rows, data-preserving for the live rows, none exist yet); 2. login and token scope; 3. bootstrap and invite reuse an existing identity; 4. UI institution picker; e2e adversarial tests (two institutions, same email, cross-institution access denied).
 
+## 2m. Co-applicant visibility: shared by default, with a disclosure (user decision 2026-11-08)
+
+Decision: co-owners on one loan see each other's borrower information (income, assets, liabilities) by default, as they would on a joint mortgage application. A plain-language notice appears at the point of entry, before an owner types anything: "Everyone on this loan will see what you enter." The default rests on common practice for joint applications, not on a legal rule: the current URLA (2021) is organised per borrower and does not itself require co-borrowers to see each other's information. Confirm with mortgage compliance counsel before launch.
+
+Planned shape (not built), one commit each:
+1. Keep borrower information in per-owner records (no shared blob), so visibility can be restricted later without a migration.
+2. Show the disclosure on every owner-entered financial section. An owner cannot save before it has been shown. Decide whether to record when (`disclosureShownAt` or similar).
+3. Read rules: owners of a property see every co-owner's borrower information for that property only. Underwriters see all borrowers on their own institution's files. Everyone else gets the same 404 as other property reads. Buyers browsing listings see none (listings already expose id, address, status and date only).
+4. Items an applicant may choose not to have considered (for example alimony or child support) stay optional and are not shown as missing.
+5. Update `docs/specs/` in the same commit as each step.
+
+Acceptance (draft): an owner who has not been shown the notice cannot save financial information; co-owner A can read co-owner B's borrower information on a shared property; a non-owner gets 404; the silent investor role (item 10) is excluded until its visibility is defined.
+
+Open (user):
+- Is every owner also a borrower on the loan? Title and loan are separate roles (compare non-borrowing occupants).
+- What can a silent investor see?
+- Does visibility need to be configurable per lender?
+
 ## 3. Deploy hardening
 
 - Tested rollback (needs a second revision; may need revisions-mode multiple and Terraform changes, ask first).
