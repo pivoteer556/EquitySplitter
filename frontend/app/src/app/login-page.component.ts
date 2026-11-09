@@ -13,12 +13,6 @@ import { friendlyError } from './error-message';
   styleUrl: './login-page.component.css',
 })
 export class LoginPageComponent {
-  institutionName = '';
-  officerName = '';
-  officerEmail = '';
-  setupToken = ''; // memory only: cleared after every attempt, never persisted
-  activationLink = '';
-
   loginEmail = '';
   loginPassword = '';
 
@@ -30,31 +24,6 @@ export class LoginPageComponent {
     private readonly api: ApiService,
     private readonly router: Router,
   ) {}
-
-  bootstrapInstitution(): void {
-    this.error = '';
-    this.lastResponse = '';
-    this.activationLink = '';
-    this.loading = true;
-    const token = this.setupToken;
-    this.setupToken = '';
-    this.api.bootstrapInstitution({
-      institutionName: this.institutionName,
-      officerName: this.officerName,
-      officerEmail: this.officerEmail,
-    }, token).subscribe({
-      next: (res) => {
-        // No session yet: the officer activates through this link and then signs in.
-        this.activationLink = window.location.origin + res.activationPath;
-        this.loading = false;
-      },
-      error: (err) => {
-        // A wrong or missing setup token is a generic 404 from the server; do not say whether the endpoint exists.
-        this.error = err?.status === 404 ? 'Setup token not accepted.' : friendlyError(err);
-        this.loading = false;
-      },
-    });
-  }
 
   login(): void {
     this.error = '';

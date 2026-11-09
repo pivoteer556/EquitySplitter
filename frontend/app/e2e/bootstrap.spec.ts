@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { BOOTSTRAP_TOKEN } from './constants';
 
-// Adversarial suite for the Bootstrap New Institution form, against the REAL backend (which requires
+// Adversarial suite for the Bootstrap New Institution form (on its own /bootstrap page, reached by URL only), against the REAL backend (which requires
 // X-Bootstrap-Token). The signup limiter allows 10/hour/IP and global-setup already used one, so keep the
 // number of requests that reach the backend small.
 
 const BOOTSTRAP_API = '**/api/v1/auth/institution/bootstrap';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/login');
+  await page.goto('/bootstrap');
   await expect(page.getByRole('heading', { name: 'Bootstrap New Institution' })).toBeVisible();
   // The fields start empty (no demo defaults), so every test fills them.
   await page.getByLabel('Institution name').fill('Bootstrap E2E Lending');
@@ -72,4 +72,13 @@ test('the form starts empty and says a setup token is needed', async ({ page }) 
   }
   await expect(page.locator('#setup-note')).toContainText('requires a setup token');
   await expect(page).toHaveTitle('Equity Splitter');
+});
+
+test('the sign-in page does not show the bootstrap form and does not link to /bootstrap', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible();
+  await expect(page.locator('#bootstrap-form')).toHaveCount(0);
+  await expect(page.getByLabel('Setup token')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Bootstrap New Institution' })).toHaveCount(0);
+  await expect(page.locator('a[href="/bootstrap"]')).toHaveCount(0);
 });

@@ -6,9 +6,11 @@ import { ActivatePageComponent } from './activate-page.component';
 import { ListingsPageComponent } from './listings-page.component';
 import { authGuard, officerGuard } from './auth.guard';
 import { BuyerPageComponent } from './buyer-page.component';
+import { BootstrapPageComponent } from './bootstrap-page.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginPageComponent },
+  { path: 'bootstrap', component: BootstrapPageComponent },
   { path: 'buyer', component: BuyerPageComponent },
   { path: 'accept-invite', component: AcceptInvitePageComponent },
   { path: 'activate', component: ActivatePageComponent },

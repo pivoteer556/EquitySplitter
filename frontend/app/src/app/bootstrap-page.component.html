@@ -1,0 +1,30 @@
+<div class="bootstrap-shell">
+  <header class="hero">
+    <p class="eyebrow">Shared Mortgage Platform</p>
+    <h1>Bootstrap New Institution</h1>
+  </header>
+
+  <section>
+    <p id="setup-note">Creating an institution requires a setup token from the platform administrator.</p>
+    <form id="bootstrap-form" (ngSubmit)="bootstrapInstitution()" ngNativeValidate>
+      <input name="institutionName" [(ngModel)]="institutionName" placeholder="e.g. Atlas Lending" aria-label="Institution name" required />
+      <input name="officerName" [(ngModel)]="officerName" placeholder="e.g. Casey Officer" aria-label="Loan officer name" required />
+      <input name="officerEmail" type="email" [(ngModel)]="officerEmail" placeholder="e.g. casey@example.com" aria-label="Loan officer email" required />
+      <label for="setup-token">Setup token</label>
+      <input id="setup-token" name="setupToken" type="password" autocomplete="off" required [(ngModel)]="setupToken" />
+      <button type="submit" [disabled]="loading">
+        {{ loading ? 'Working...' : 'Bootstrap Institution' }}
+      </button>
+    </form>
+    @if (activationLink) {
+      <div class="activation" role="status">
+        <p>Institution created. Give this one-time link to the loan officer so they can set a password:</p>
+        <p><a [href]="activationLink">{{ activationLink }}</a></p>
+      </div>
+    }
+  </section>
+
+  @if (error) {
+    <pre class="error" role="alert">{{ error }}</pre>
+  }
+</div>
