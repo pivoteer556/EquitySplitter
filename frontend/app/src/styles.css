@@ -10,6 +10,12 @@
      so no extra darkening of the blue was needed beyond the hover shade. */
   --brand-blue-dark: #2A4688;
   --brand-tint: #F4F7FC;
+  /* Cards/panels sit on white with a pale blue border so they lift off the --brand-tint page.
+     Contrast: navy on surface 16.0:1, navy on tint 14.9:1; surface vs tint 1.07:1 and border vs tint 1.36:1 (edges, not text,
+     so the 1px border plus --brand-shadow carries the separation). */
+  --brand-surface: #FFFFFF;
+  --brand-border: #C9D6EE;
+  --brand-shadow: 0 1px 3px rgba(20, 33, 61, 0.1);
   --brand-font: "Bricolage Grotesque", sans-serif;
 }
 

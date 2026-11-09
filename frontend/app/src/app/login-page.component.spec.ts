@@ -39,6 +39,14 @@ describe('LoginPageComponent', () => {
     expect(getComputedStyle(root.querySelector('h1')!).color).toBe('rgb(20, 33, 61)'); // --brand-navy #14213D
   });
 
+  it('draws the card as a white surface with a pale blue border, distinct from the page tint', () => {
+    const root = setup(undefined).nativeElement as HTMLElement;
+    const card = getComputedStyle(root.querySelector('.login-shell')!);
+    expect(card.backgroundColor).toBe('rgb(255, 255, 255)'); // --brand-surface
+    expect(card.borderTopColor).toBe('rgb(201, 214, 238)'); // --brand-border #C9D6EE
+    expect(card.backgroundColor).not.toBe(getComputedStyle(document.body).backgroundColor);
+  });
+
   it('starts the bootstrap form empty and explains the setup token', () => {
     const fixture = setup(undefined);
     const c = fixture.componentInstance;

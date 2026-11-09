@@ -18,6 +18,13 @@ test('sign-in button uses the brand blue', async ({ page }) => {
   await expect(loginButton(page)).toHaveCSS('background-color', 'rgb(58, 95, 176)');
 });
 
+test('sign-in card is a white surface distinct from the page background', async ({ page }) => {
+  const card = page.locator('.login-shell');
+  await expect(card).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  const body = await page.locator('body').evaluate((e) => getComputedStyle(e).backgroundColor);
+  expect(body).not.toBe('rgb(255, 255, 255)');
+});
+
 test.describe('client-side validation cannot be skipped by typing nothing useful', () => {
   test('empty submit sends no request and shows no session', async ({ page }) => {
     const calls = countLoginCalls(page);
