@@ -31,6 +31,17 @@ describe('LoginPageComponent', () => {
     return fixture;
   }
 
+  it('starts the bootstrap form empty and explains the setup token', () => {
+    const fixture = setup(undefined);
+    const c = fixture.componentInstance;
+    expect([c.institutionName, c.officerName, c.officerEmail]).toEqual(['', '', '']);
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('#setup-note')?.textContent).toContain('requires a setup token');
+    for (const n of ['institutionName', 'officerName', 'officerEmail']) {
+      expect(root.querySelector(`#bootstrap-form input[name="${n}"]`)?.hasAttribute('required')).toBeTrue();
+    }
+  });
+
   it('shows a plain sentence when login fails with 401', () => {
     const fixture = setup({ status: 401, error: { detail: 'Invalid credentials' } });
     fixture.componentInstance.login();

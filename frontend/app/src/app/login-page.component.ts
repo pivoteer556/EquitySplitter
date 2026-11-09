@@ -13,9 +13,9 @@ import { friendlyError } from './error-message';
   styleUrl: './login-page.component.css',
 })
 export class LoginPageComponent {
-  institutionName = 'Atlas Lending';
-  officerName = 'Casey Officer';
-  officerEmail = 'casey.officer@example.com';
+  institutionName = '';
+  officerName = '';
+  officerEmail = '';
   setupToken = ''; // memory only: cleared after every attempt, never persisted
   activationLink = '';
 
