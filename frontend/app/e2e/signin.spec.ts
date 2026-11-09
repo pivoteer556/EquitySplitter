@@ -18,11 +18,11 @@ test('sign-in button uses the brand blue', async ({ page }) => {
   await expect(loginButton(page)).toHaveCSS('background-color', 'rgb(58, 95, 176)');
 });
 
-test('sign-in card is a cream surface distinct from the night page background', async ({ page }) => {
+test('sign-in card is a cream surface distinct from the light blue page background', async ({ page }) => {
   const card = page.locator('.login-shell');
   await expect(card).toHaveCSS('background-color', 'rgb(248, 237, 203)');
   const body = await page.locator('body').evaluate((e) => getComputedStyle(e).backgroundColor);
-  expect(body).toBe('rgb(14, 22, 38)');
+  expect(body).toBe('rgb(169, 193, 238)');
   expect(body).not.toBe('rgb(248, 237, 203)');
 });
 
@@ -400,8 +400,7 @@ test.describe('session and routing', () => {
 test('brand header shows on /login and on another route (/buyer)', async ({ page }) => {
   const header = page.locator('header.brand');
   await expect(header).toBeVisible();
-  await expect(header.getByRole('img', { name: /EquitySplitter logo mark/ })).toBeVisible();
-  await expect(header).toContainText('EquitySplitter');
+  await expect(header.getByRole('img', { name: 'EquitySplitter' })).toBeVisible();
   await page.goto('/buyer');
   await expect(header).toBeVisible();
 });

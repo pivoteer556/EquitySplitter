@@ -59,33 +59,26 @@ pre {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
   max-width: 900px;
   margin: 0 auto;
   padding: 16px 24px 12px;
   border-bottom: 2px solid var(--brand-amber);
-  font-family: var(--brand-font);
-  font-size: 1.5rem;
-  color: var(--brand-on-dark);
 }
 
-.brand-equity {
-  font-weight: 500;
+/* Lockup: height drives size, width follows the viewBox. Fills come from brand tokens, never raw hex in the markup. */
+.logo {
+  height: 40px;
+  width: auto;
 }
 
-.brand-splitter {
-  font-weight: 800;
+.logo-navy {
+  fill: var(--brand-navy);
 }
 
-.share-navy {
-  fill: var(--brand-on-dark);
+.logo-blue {
+  fill: var(--brand-blue);
 }
 
-.share-blue {
-  /* #3A5FB0 on night is 2.96:1, just under the 3:1 graphics guideline; the on-dark blue is 7.1:1. */
-  fill: var(--brand-link-on-dark);
-}
-
-.share-amber {
+.logo-amber {
   fill: var(--brand-amber);
 }

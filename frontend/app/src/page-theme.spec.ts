@@ -1,4 +1,4 @@
-// Global night-page theme (styles.css): dark page, light text directly on it.
+// Global page theme (styles.css): light blue page, navy text directly on it, cream cards.
 function luminance(rgb: string): number {
   const [r, g, b] = (rgb.match(/\d+/g) ?? []).slice(0, 3).map((v) => {
     const c = Number(v) / 255;
@@ -11,15 +11,16 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe('page theme (campfire night)', () => {
-  it('puts a deep night background on the page with text that reads on it', () => {
+describe('page theme (light blue page)', () => {
+  it('puts a light blue background on the page with navy text that reads on it', () => {
     const body = getComputedStyle(document.body);
-    expect(body.backgroundColor).toBe('rgb(14, 22, 38)'); // --brand-night #0E1626
+    expect(body.backgroundColor).toBe('rgb(169, 193, 238)'); // --brand-page #A9C1EE
+    expect(body.color).toBe('rgb(20, 33, 61)'); // --brand-navy
     expect(body.color).not.toBe(body.backgroundColor);
     expect(contrast(body.color, body.backgroundColor)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps a page-level heading and link readable on the night page', () => {
+  it('keeps a page-level heading and link readable on the light blue page', () => {
     const host = document.createElement('main');
     host.innerHTML = '<h1>Title</h1><a href="/x">link</a>';
     document.body.appendChild(host);

@@ -21,23 +21,24 @@ describe('App', () => {
     expect(compiled.querySelector('router-outlet')).not.toBeNull();
   });
 
-  it('should render the brand header with the logo mark and the two-weight wordmark', () => {
+  it('renders the lockup logo inline in the brand header with an accessible name', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const header = (fixture.nativeElement as HTMLElement).querySelector('header.brand');
     expect(header).not.toBeNull();
-    const mark = header!.querySelector('svg[role="img"]');
-    expect(mark?.getAttribute('aria-label')).toBe(
-      'EquitySplitter logo mark: a house divided into three unequal shares',
-    );
-    expect(header!.querySelector('.brand-equity')?.textContent).toBe('Equity');
-    expect(header!.querySelector('.brand-splitter')?.textContent).toBe('Splitter');
+    const logo = header!.querySelector('svg.logo[role="img"]');
+    expect(logo).not.toBeNull();
+    expect(logo!.getAttribute('aria-label')).toBe('EquitySplitter');
+    // Both halves of the split "Splitter" exist, and the mark's three shares.
+    expect(logo!.querySelectorAll('.logo-navy').length).toBeGreaterThanOrEqual(2);
+    expect(logo!.querySelectorAll('.logo-blue').length).toBeGreaterThanOrEqual(2);
+    expect(logo!.querySelectorAll('.logo-amber').length).toBe(1);
   });
 
-  it('draws the header and logo so they are visible on the night page', () => {
+  it('draws the logo from brand tokens and keeps it legible on the page color', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
-    const header = (fixture.nativeElement as HTMLElement).querySelector('header.brand')!;
+    const logo = (fixture.nativeElement as HTMLElement).querySelector('header.brand svg.logo')!;
     const bg = getComputedStyle(document.body).backgroundColor;
     const lum = (rgb: string) => {
       const [r, g, b] = (rgb.match(/\d+/g) ?? []).slice(0, 3).map((v) => {
@@ -50,13 +51,16 @@ describe('App', () => {
       const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
       return (hi + 0.05) / (lo + 0.05);
     };
-    const text = getComputedStyle(header).color;
-    expect(text).not.toBe(bg);
-    expect(ratio(text, bg)).toBeGreaterThanOrEqual(4.5);
-    for (const part of ['.share-navy', '.share-blue']) {
-      const fill = getComputedStyle(header.querySelector(part)!).fill;
-      expect(fill).not.toBe(bg);
-      expect(ratio(fill, bg)).toBeGreaterThanOrEqual(3);
+    const fillOf = (sel: string) => getComputedStyle(logo.querySelector(sel)!).fill;
+    // Tokens: navy #14213D, amber #E0A800 (blue may be --brand-blue or a darker token, so only its contrast is pinned).
+    expect(fillOf('.logo-navy')).toBe('rgb(20, 33, 61)');
+    expect(fillOf('.logo-amber')).toBe('rgb(224, 168, 0)');
+    // Depends on the page color token (Melchior): navy text-like parts need 4.5:1, blue graphics 3:1.
+    for (const el of Array.from(logo.querySelectorAll('.logo-navy'))) {
+      expect(ratio(getComputedStyle(el).fill, bg)).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const el of Array.from(logo.querySelectorAll('.logo-blue'))) {
+      expect(ratio(getComputedStyle(el).fill, bg)).toBeGreaterThanOrEqual(3);
     }
   });
 });
