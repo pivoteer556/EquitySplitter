@@ -3,9 +3,12 @@
 // Bootstrap needs a signed-in platform admin, created the way the operator does: run the script against the e2e
 // database, redeem the one-time link it prints, log in with the password chosen there.
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { BOOTSTRAP_TOKEN, E2E_DATABASE_URL } from './constants';
 
+export const ADMIN_TOKEN_FILE = resolve(tmpdir(), 'equity-e2e-admin-token');
 export const API = 'http://127.0.0.1:8000/api/v1';
 export const ADMIN_EMAIL = 'admin@e2e.example.com';
 export const ADMIN_PASSWORD = 'Adm1n!Passw0rd#e2e';
@@ -56,6 +59,9 @@ export default async function globalSetup(): Promise<void> {
   // Officers have no password until they use the activation link; do that over the API with the admin password.
   const act = await activate(body.activationToken, ADMIN_PASSWORD);
   if (act.status !== 200) throw new Error(`e2e admin activation failed: ${act.status} ${await act.text()}`);
+  // An officer's password login now needs an authenticator code, so the specs cannot log the admin in per call. They
+  // chain the session the activation just returned instead (see adminCall in helpers.ts).
+  writeFileSync(ADMIN_TOKEN_FILE, (await act.json()).accessToken);
 }
 
 /**

@@ -63,6 +63,37 @@ describe('ApiService base URL', () => {
     http.verify();
   });
 
+  it('login with an enrolment challenge stores nothing', () => {
+    const { api, http } = loginSetup();
+    api.login('o@b.c', 'x').subscribe();
+    http.expectOne(`${environment.apiBaseUrl}/auth/login`).flush({ userType: 'institution_user', enrolmentRequired: true, challengeToken: 'chal' });
+    expect(api.getInstitutionToken()).toBe('');
+    expect(api.getUserToken()).toBe('');
+    http.verify();
+  });
+
+  it('enrolStart posts the challenge and returns the secret; enrolConfirm posts challenge and code and stores the officer session', () => {
+    const { api, http } = loginSetup();
+    let started: unknown;
+    api.enrolStart('chal').subscribe((r) => (started = r));
+    const start = http.expectOne(`${environment.apiBaseUrl}/auth/login/totp/enroll-start`);
+    expect(start.request.method).toBe('POST');
+    expect(start.request.body).toEqual({ challengeToken: 'chal' });
+    start.flush({ secret: 'S', otpauthUri: 'otpauth://x' });
+    expect(started).toEqual({ secret: 'S', otpauthUri: 'otpauth://x' });
+    expect(api.getInstitutionToken()).toBe('');
+
+    api.enrolConfirm('chal', '123456').subscribe();
+    const conf = http.expectOne(`${environment.apiBaseUrl}/auth/login/totp/enroll-confirm`);
+    expect(conf.request.body).toEqual({ challengeToken: 'chal', code: '123456' });
+    conf.flush({ accessToken: 'officer-jwt', tokenType: 'Bearer', userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'inst-9' });
+    expect(api.getInstitutionToken()).toBe('officer-jwt');
+    expect(api.getInstitutionId()).toBe('inst-9');
+    api.clearTokens();
+    api.setInstitutionId('');
+    http.verify();
+  });
+
   it('login stores an institution_user as the officer token and institution id, not the user token', () => {
     const { api, http } = loginSetup();
 

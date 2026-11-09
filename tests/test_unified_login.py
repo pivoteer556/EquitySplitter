@@ -2,10 +2,9 @@
 
 from app.models import InstitutionUser, User
 from app.services.auth import hash_password
-from tests.conftest import STRONG_PASSWORD, make_platform_admin
+from tests.conftest import STRONG_PASSWORD, make_platform_admin, sign_in_officer
 
 LOGIN = "/api/v1/auth/login"
-OFFICER_LOGIN = "/api/v1/auth/institution/login"
 MAX_FAILURES = 5
 
 
@@ -17,10 +16,8 @@ def _register_owner(client, email="sam@example.com"):
     client.post("/api/v1/auth/register", json={"name": "Sam", "email": email, "password": STRONG_PASSWORD})
 
 
-def test_officer_signs_in_with_access_info(client, officer):
-    resp = _login(client, "casey@example.com")
-    assert resp.status_code == 200
-    body = resp.json()
+def test_officer_signs_in_with_access_info(client, officer, clock):
+    body = sign_in_officer(client, clock, "casey@example.com")
     assert body["tokenType"] == "Bearer"
     assert body["userType"] == "institution_user"
     assert body["isPlatformAdmin"] is False
@@ -63,14 +60,6 @@ def test_sixth_failure_is_429_and_correct_password_is_refused(client, officer):
     assert blocked.status_code == 429
     assert int(blocked.headers["Retry-After"]) >= 1
     assert _login(client, "casey@example.com").status_code == 429
-
-
-def test_alternating_endpoints_share_one_budget(client, officer):
-    for i in range(MAX_FAILURES):
-        url = LOGIN if i % 2 == 0 else OFFICER_LOGIN
-        assert _login(client, "casey@example.com", "WrongPass123!", url).status_code == 401
-    assert _login(client, "casey@example.com", "WrongPass123!", LOGIN).status_code == 429
-    assert _login(client, "casey@example.com", "WrongPass123!", OFFICER_LOGIN).status_code == 429
 
 
 def _same_email_owner_and_officer(session_factory, officer):

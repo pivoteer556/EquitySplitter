@@ -64,7 +64,7 @@ def test_signup_limit_does_not_affect_login_counters(client, officer):
     for i in range(MAX_SIGNUPS):
         _register(client, i)
     resp = client.post(
-        "/api/v1/auth/institution/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD}
+        "/api/v1/auth/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD}
     )
     assert resp.status_code == 200
 

@@ -7,6 +7,7 @@ import { environment } from '../environments/environment';
 import {
   Acknowledgement,
   AuthTokenResponse,
+  EnrolmentChallenge,
   Institution,
   InstitutionBootstrapResponse,
   InstitutionUserCreated,
@@ -17,6 +18,7 @@ import {
   PropertyDetailResponse,
   PropertyOwnersResponse,
   SecondFactorChallenge,
+  TotpEnrollment,
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -58,10 +60,10 @@ export class ApiService {
   }
 
   /** One sign-in for every account; userType in the response decides which stored token (officer or user) it becomes. */
-  login(email: string, password: string): Observable<LoginResponse | SecondFactorChallenge> {
-    return this.http.post<LoginResponse | SecondFactorChallenge>(`${this.baseUrl}/auth/login`, { email, password }).pipe(
+  login(email: string, password: string): Observable<LoginResponse | SecondFactorChallenge | EnrolmentChallenge> {
+    return this.http.post<LoginResponse | SecondFactorChallenge | EnrolmentChallenge>(`${this.baseUrl}/auth/login`, { email, password }).pipe(
       tap((res) => {
-        if (!('secondFactorRequired' in res)) this.storeLogin(res); // a challenge is not a session: store nothing
+        if (!('secondFactorRequired' in res) && !('enrolmentRequired' in res)) this.storeLogin(res); // a challenge is not a session: store nothing
       }),
     );
   }
@@ -69,6 +71,16 @@ export class ApiService {
   /** Second sign-in step for an officer with an authenticator; stores the session exactly as login does. */
   loginTotp(challengeToken: string, code: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login/totp`, { challengeToken, code }).pipe(tap((res) => this.storeLogin(res)));
+  }
+
+  /** First sign-in of an officer with no authenticator: ask for a (new) secret to show them. Stores nothing. */
+  enrolStart(challengeToken: string): Observable<TotpEnrollment> {
+    return this.http.post<TotpEnrollment>(`${this.baseUrl}/auth/login/totp/enroll-start`, { challengeToken });
+  }
+
+  /** Confirms the first code; the answer is a normal login, stored exactly as login does. */
+  enrolConfirm(challengeToken: string, code: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login/totp/enroll-confirm`, { challengeToken, code }).pipe(tap((res) => this.storeLogin(res)));
   }
 
   private storeLogin(res: LoginResponse): void {

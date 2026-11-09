@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { PLATFORM_ADMIN_EMAIL, PLATFORM_ADMIN_PASSWORD } from './global-setup';
-import { alertBox, countLoginCalls, countRequests, expectNoSession, fill, LOGIN_API, makeTotpOfficer, makeUser, totpCode } from './helpers';
+import { alertBox, completeEnrolment, countLoginCalls, countRequests, expectNoSession, fill, LOGIN_API, makeTotpOfficer, makeUser, totpCode } from './helpers';
 
 // Adversarial suite for Sign In, run against the REAL backend (throwaway database `equity_e2e`).
 // Only tests labelled "fault injection" intercept /api/v1: they simulate failures a healthy backend
@@ -175,6 +175,7 @@ test.describe('real backend responses', () => {
     }
     await fill(page, other.email, other.password);
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
   });
 
@@ -182,6 +183,7 @@ test.describe('real backend responses', () => {
     const user = await makeUser('casing');
     await fill(page, user.email.toUpperCase(), user.password);
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
   });
 
@@ -189,6 +191,7 @@ test.describe('real backend responses', () => {
     const user = await makeUser('ok');
     await fill(page, user.email, user.password);
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
     const token = await page.evaluate(() => localStorage.getItem('institutionToken'));
     expect(token).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/);
@@ -208,6 +211,7 @@ test.describe('real backend responses', () => {
     const user = await makeUser('leak');
     await fill(page, user.email, user.password);
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
     expect(await page.evaluate(() => (window as unknown as Win).__leaks)).toEqual([]);
     await expect(page.locator('body')).not.toContainText('eyJ');
@@ -288,6 +292,7 @@ test.describe('fault injection (responses a healthy backend cannot produce)', ()
     await expect(loginButton(page)).toBeEnabled();
     fail = false; // network recovers; the same form must work without a reload
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
   });
 
@@ -314,6 +319,7 @@ test.describe('fault injection (responses a healthy backend cannot produce)', ()
     await fill(page, user.email, user.password);
     for (let i = 0; i < 6; i++) await page.locator('#login-password').press('Enter');
     await page.getByRole('button', { name: /Signing in|Login/ }).click({ force: true, noWaitAfter: true }).catch(() => undefined);
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
     expect(bodies).toHaveLength(1);
   });
@@ -331,6 +337,7 @@ test.describe('fault injection (responses a healthy backend cannot produce)', ()
     await loginButton(page).click();
     await expect(page.getByRole('button', { name: 'Signing in...' })).toBeVisible();
     await page.locator('#login-email').fill('someone-else@e2e.example.com'); // typed while pending
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
     expect(JSON.parse(sent[0]).email).toBe(user.email);
     expect(sent).toHaveLength(1);
@@ -360,6 +367,7 @@ test.describe('keyboard-only', () => {
     await page.keyboard.press('Tab');
     await expect(loginButton(page)).toBeFocused();
     await page.keyboard.press('Enter');
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
   });
 
@@ -370,6 +378,7 @@ test.describe('keyboard-only', () => {
     await expect(alertBox(page)).toHaveText('Incorrect email or password.');
     await page.locator('#login-password').fill(user.password);
     await page.locator('#login-password').press('Enter');
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
   });
 });
@@ -402,6 +411,7 @@ test.describe('session and routing', () => {
     const user = await makeUser('logout');
     await fill(page, user.email, user.password);
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
     await page.getByRole('button', { name: 'Logout' }).click();
     await expect(page).toHaveURL(/\/login$/);
@@ -416,6 +426,7 @@ test.describe('session and routing', () => {
     const user = await makeUser('residue');
     await fill(page, user.email, user.password);
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
     await page.getByRole('button', { name: 'Logout' }).click();
     await expect(page).toHaveURL(/\/login$/);
@@ -426,6 +437,7 @@ test.describe('session and routing', () => {
     const user = await makeUser('reload');
     await fill(page, user.email, user.password);
     await loginButton(page).click();
+    await completeEnrolment(page);
     await expect(page).toHaveURL(/\/workbench$/);
     await page.reload();
     await expect(page).toHaveURL(/\/workbench$/);
@@ -480,4 +492,51 @@ test('an officer with an authenticator: password alone, then a wrong code, store
   expect(totpCalls.count()).toBe(2);
   expect(loginCalls.count()).toBe(1); // the password was sent once; the code step did not resend it
   expect((await tokens())[0]).toBeTruthy();
+});
+
+test('an officer with no authenticator is enrolled at first sign-in: password alone and a wrong code store nothing; the right code signs in; the next sign-in asks for a code', async ({ page }) => {
+  const officer = await makeUser('enrol');
+  const confirmCalls = countRequests(page, '/auth/login/totp/enroll-confirm');
+  const tokens = () => page.evaluate(() => [localStorage.getItem('institutionToken'), localStorage.getItem('userToken')]);
+
+  await fill(page, officer.email, officer.password);
+  const first = page.waitForResponse(LOGIN_API);
+  await loginButton(page).click();
+  const body = await (await first).json();
+  expect(body.enrolmentRequired).toBe(true);
+  expect(body.accessToken).toBeUndefined();
+  await expect(page.locator('#enrol-form')).toBeVisible();
+  await expect(page.locator('#login-code')).toHaveCount(0);
+  await expect(page.locator('#enrol-link')).toHaveAttribute('href', /^otpauth:\/\/totp\//);
+  const secret = (await page.locator('#enrol-secret').innerText()).trim();
+  expect(secret).toMatch(/^[A-Z2-7]{16,}$/);
+  expect(await tokens()).toEqual([null, null]);
+  expect(new URL(page.url()).pathname).toBe('/login');
+
+  // Wrong code: any 6 digits that are not valid in the accepted window.
+  const valid = [-2, -1, 0, 1, 2].map((o) => totpCode(secret, o));
+  const wrong = ['000000', '111111', '222222'].find((c) => !valid.includes(c))!;
+  await page.locator('#enrol-code').fill(wrong);
+  const bad = page.waitForResponse('**/api/v1/auth/login/totp/enroll-confirm');
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
+  expect((await bad).status()).toBe(401);
+  await expect(alertBox(page)).toHaveText('Incorrect or expired code. Check your authenticator app and try again.');
+  expect(confirmCalls.count()).toBe(1);
+  expect(await tokens()).toEqual([null, null]);
+  expect(new URL(page.url()).pathname).toBe('/login');
+
+  await page.locator('#enrol-code').fill(totpCode(secret));
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
+  await expect(page).toHaveURL(/\/workbench$/);
+  expect((await tokens())[0]).toBeTruthy();
+
+  // Signed out and back in: the authenticator now exists, so the page asks for a code, never for enrolment.
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await fill(page, officer.email, officer.password);
+  const again = page.waitForResponse(LOGIN_API);
+  await loginButton(page).click();
+  expect((await (await again).json()).secondFactorRequired).toBe(true);
+  await expect(page.locator('#login-code')).toBeVisible();
+  await expect(page.locator('#enrol-form')).toHaveCount(0);
 });

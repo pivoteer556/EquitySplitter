@@ -1,7 +1,7 @@
 from tests.conftest import BOOTSTRAP_HEADERS, STRONG_PASSWORD, bearer
 
 BOOTSTRAP = "/api/v1/auth/institution/bootstrap"
-LOGIN = "/api/v1/auth/institution/login"
+LOGIN = "/api/v1/auth/login"
 ACTIVATE = "/api/v1/auth/institution/activate"
 
 
@@ -89,10 +89,10 @@ def test_login_unknown_account_is_generic_failure(client):
 
 
 def test_institution_login(client, officer):
-    ok = client.post("/api/v1/auth/institution/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD})
+    ok = client.post("/api/v1/auth/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD})
     assert ok.status_code == 200
     bad = client.post(
-        "/api/v1/auth/institution/login", json={"email": "casey@example.com", "password": "WrongPass123!"}
+        "/api/v1/auth/login", json={"email": "casey@example.com", "password": "WrongPass123!"}
     )
     assert bad.status_code == 401
 

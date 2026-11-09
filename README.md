@@ -24,7 +24,7 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   redeploy; the trade-off is that a database leak exposes signing keys, so the DB must be treated as a
   secret store. Tokens are also pinned to a server-side `lastTokenIssuedAt`, so only the latest token per account
   is accepted and institution users can be revoked.
-- **Rate limiting** — logins (`/auth/login`, `/auth/institution/login`): 5 failed attempts per 60 s per email+IP return
+- **Rate limiting** — logins (`/auth/login`, `/auth/login/totp`, `/auth/login/totp/enroll-start`, `/auth/login/totp/enroll-confirm`): 5 failed attempts per 60 s per email+IP return
   HTTP 429 with `Retry-After`. Counters live in the database (`rateLimitHits`, keyed by a SHA-256 of the
   scope+IP+email, so no email/IP is stored), which makes them shared across replicas and durable across restarts.
   Check-then-record is not atomic, so concurrent requests can slip a few attempts past the threshold.
@@ -45,9 +45,20 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   expired challenge, is `401 Invalid credentials`; a malformed code is 422. Failures count in the same `login` bucket as
   the password step (5 per 60 s per IP+email), and a correct password on such an officer does NOT reset that counter,
   only a finished sign-in does. Replay protection is the credential's `lastUsedStep`. Known limits: the challenge token
-  is not single-use (the code is); officers with no confirmed credential still sign in on the password alone (the
-  required enrolment at first sign-in is planned, BACKLOG 2l); users and owners have no credential yet; recovery codes,
-  reset and an enrolment UI are planned.
+  is not single-use (the code is); users and owners have no credential yet; recovery codes and reset are planned.
+- **Enrolment at first sign-in (officers)** — when an officer with NO confirmed authenticator passes the password check,
+  `POST /auth/login` returns `{userType: "institution_user", enrolmentRequired: true, challengeToken}` and no access
+  token. The challenge is a 5-minute JWT with purpose `enrolment_challenge`, distinct from the second step's
+  `login_challenge`: neither works as an access token or as the other. `POST /auth/login/totp/enroll-start`
+  `{challengeToken}` returns `{secret, otpauthUri}` (replacing a pending unconfirmed credential);
+  `POST /auth/login/totp/enroll-confirm` `{challengeToken, code}` confirms it (sets `confirmedAt` and `lastUsedStep`) and
+  returns the normal login response, resetting the limiter. A wrong code, a bad or expired token, or an officer who is
+  already enrolled is `401 Invalid credentials`; wrong codes (and an already-enrolled officer on `enroll-confirm`) count in
+  the shared `login` bucket, a bad token does not (no email to key on); a malformed code is 422.
+  `POST /auth/institution/login` was REMOVED (404): it returned a token on the password alone, bypassing both factors.
+  The bearer endpoints `/auth/institution/totp/enroll` and `/confirm` remain. Planned, not built: user and owner
+  credentials, recovery codes, the admin role, reset, a back/restart control (an expired challenge means signing in
+  again), a QR code (the login page shows the secret as text plus an otpauth link) and a 429 UI message.
 - **CORS** — `http://localhost:4200` and `http://127.0.0.1:4200` are always allowed. Set `CORS_ALLOW_ORIGINS` to a
   comma-separated list of extra origins (e.g. `https://site.example.net,https://other.example`) to allow a deployed
   frontend. Whitespace, empty entries, trailing slashes and `*` are ignored.
@@ -170,7 +181,6 @@ Notes:
 
 ## Endpoints (Feature 1)
 - `POST /api/v1/auth/institution/bootstrap`
-- `POST /api/v1/auth/institution/login`
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login` (signs in any account, user or officer; returns `accessToken` plus `userType`, `isPlatformAdmin`, `role`, `institutionId`)
 - `POST /api/v1/institutions`

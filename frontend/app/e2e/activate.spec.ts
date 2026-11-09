@@ -1,6 +1,6 @@
 import { expect, Page, test } from '@playwright/test';
 import { activate } from './global-setup';
-import { alertBox, GOOD_PASSWORD, makePendingOfficer } from './helpers';
+import { alertBox, completeEnrolment, GOOD_PASSWORD, makePendingOfficer } from './helpers';
 
 // /activate page against the REAL backend: an officer created without a password sets one through the link.
 
@@ -38,6 +38,7 @@ test('happy path: the link sets the password, lands on the workbench, and the pa
 
   await page.evaluate(() => localStorage.clear());
   await signIn(page, email, GOOD_PASSWORD);
+  await completeEnrolment(page); // the officer has no authenticator yet
   await expect(page).toHaveURL(/\/workbench$/);
 });
 

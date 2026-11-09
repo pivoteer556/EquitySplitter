@@ -2,7 +2,7 @@ import pytest
 
 from tests.conftest import STRONG_PASSWORD
 
-LOGIN_URLS = ["/api/v1/auth/login", "/api/v1/auth/institution/login"]
+LOGIN_URLS = ["/api/v1/auth/login"]  # the legacy officer endpoint is gone (2l step 3)
 EMAIL = "casey@example.com"  # the bootstrapped officer; exists as an institution user
 MAX_FAILURES = 5
 
@@ -25,28 +25,30 @@ def test_repeated_failures_return_429_with_retry_after(client, officer, url):
 
 
 def test_correct_password_is_also_blocked(client, officer):
-    url = "/api/v1/auth/institution/login"
+    url = "/api/v1/auth/login"
     _fail_until_blocked(client, url)
     assert _login(client, url, STRONG_PASSWORD).status_code == 429
 
 
-def test_success_resets_counter(client, officer):
-    url = "/api/v1/auth/institution/login"
+def test_success_resets_counter(client):
+    # A plain user: for an officer only a finished sign-in (second step) resets, not the password step.
+    url = "/api/v1/auth/login"
+    client.post("/api/v1/auth/register", json={"name": "Bea", "email": "bea@example.com", "password": STRONG_PASSWORD})
     for _ in range(MAX_FAILURES - 1):
-        assert _login(client, url, "wrong-password").status_code == 401
-    assert _login(client, url, STRONG_PASSWORD).status_code == 200
+        assert _login(client, url, "wrong-password", "bea@example.com").status_code == 401
+    assert _login(client, url, STRONG_PASSWORD, "bea@example.com").status_code == 200
     for _ in range(MAX_FAILURES - 1):
-        assert _login(client, url, "wrong-password").status_code == 401
+        assert _login(client, url, "wrong-password", "bea@example.com").status_code == 401
 
 
-def test_counters_are_independent_per_email_and_shared_across_endpoints(client, officer):
-    _fail_until_blocked(client, "/api/v1/auth/institution/login")
-    assert _login(client, "/api/v1/auth/institution/login", "x", "other@example.com").status_code != 429
+def test_counters_are_independent_per_email(client, officer):
+    _fail_until_blocked(client, "/api/v1/auth/login")
+    assert _login(client, "/api/v1/auth/login", "x", "other@example.com").status_code != 429
     assert _login(client, "/api/v1/auth/login", "x").status_code == 429  # same ip+email, same budget
     assert _login(client, "/api/v1/auth/login", "x", "other@example.com").status_code != 429
 
 
-URL = "/api/v1/auth/institution/login"
+URL = "/api/v1/auth/login"
 
 
 def _login_from(client, forwarded_for, password="wrong-password"):

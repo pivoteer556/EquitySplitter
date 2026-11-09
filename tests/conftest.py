@@ -98,6 +98,26 @@ def bootstrap_officer(client, institution_name, officer_name, officer_email, adm
     return {**body, "accessToken": activated.json()["accessToken"]}
 
 
+def sign_in_officer(client, clock, email, password=STRONG_PASSWORD):
+    """Sign an officer in the way the product now requires: password, then the authenticator. A first sign-in enrols
+    through the enrolment challenge (enroll-start, then enroll-confirm with a real code). Returns the LoginResponse
+    body plus `totpSecret`. Works once per officer: a second sign-in would need a code from a newer time step."""
+    import pyotp
+
+    resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert resp.status_code == 200, resp.text
+    challenge = resp.json()
+    assert challenge.get("enrolmentRequired") is True, challenge
+    token = challenge["challengeToken"]
+    started = client.post("/api/v1/auth/login/totp/enroll-start", json={"challengeToken": token})
+    assert started.status_code == 200, started.text
+    secret = started.json()["secret"]
+    code = pyotp.TOTP(secret).at(clock["now"])
+    done = client.post("/api/v1/auth/login/totp/enroll-confirm", json={"challengeToken": token, "code": code})
+    assert done.status_code == 200, done.text
+    return {**done.json(), "totpSecret": secret}
+
+
 @pytest.fixture()
 def officer(client):
     """Bootstrap and activate an institution; returns the response body plus accessToken (password STRONG_PASSWORD)."""

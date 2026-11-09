@@ -261,6 +261,76 @@ describe('LoginPageComponent', () => {
     });
   });
 
+  describe('enrolment at first sign-in', () => {
+    const ENROL = { userType: 'institution_user', enrolmentRequired: true, challengeToken: 'chal' };
+    const OFFICER = { userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'i1' };
+    function enrol(confirmErr?: unknown, startErr?: unknown) {
+      const startCalls: string[] = [];
+      const confirmCalls: string[][] = [];
+      const api = {
+        login: () => of(ENROL),
+        enrolStart: (t: string) => {
+          startCalls.push(t);
+          return startErr === undefined ? of({ secret: 'JBSWY3DPEHPK3PXP', otpauthUri: 'otpauth://totp/X:o?secret=JBSWY3DPEHPK3PXP' }) : throwError(() => startErr);
+        },
+        enrolConfirm: (t: string, c: string) => {
+          confirmCalls.push([t, c]);
+          return confirmErr === undefined ? of(OFFICER) : throwError(() => confirmErr);
+        },
+      };
+      TestBed.configureTestingModule({ imports: [LoginPageComponent], providers: [{ provide: ApiService, useValue: api }, provideRouter([])] });
+      const fixture = TestBed.createComponent(LoginPageComponent);
+      fixture.detectChanges();
+      const nav = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+      const c = fixture.componentInstance;
+      c.loginEmail = 'o@b.com';
+      c.loginPassword = 'pw';
+      c.login();
+      fixture.detectChanges();
+      return { fixture, nav, startCalls, confirmCalls, c, root: fixture.nativeElement as HTMLElement };
+    }
+
+    it('swaps the sign-in form for an enrolment step showing the secret and an otpauth link, and does not navigate', () => {
+      const { root, nav, startCalls } = enrol();
+      expect(root.querySelector('#signin-form')).toBeNull();
+      expect(startCalls).toEqual(['chal']);
+      expect(root.querySelector('#enrol-secret')?.textContent?.trim()).toBe('JBSWY3DPEHPK3PXP');
+      expect(root.querySelector('#enrol-link')?.getAttribute('href')).toBe('otpauth://totp/X:o?secret=JBSWY3DPEHPK3PXP');
+      const input = root.querySelector<HTMLInputElement>('#enrol-code')!;
+      expect(input.getAttribute('inputmode')).toBe('numeric');
+      expect(input.getAttribute('autocomplete')).toBe('one-time-code');
+      expect(input.getAttribute('pattern')).toBe('[0-9]{6}');
+      expect(input.getAttribute('maxlength')).toBe('6');
+      expect(input.required).toBeTrue();
+      expect(root.querySelector('#enrol-form button[type=submit]')?.textContent?.trim()).toBe('Verify and sign in');
+      expect(nav).not.toHaveBeenCalled();
+    });
+
+    it('confirming sends the challenge and the code, then goes to /workbench', () => {
+      const { c, nav, confirmCalls, fixture } = enrol();
+      c.enrolCode = '123456';
+      c.submitEnrolment();
+      fixture.detectChanges();
+      expect(confirmCalls).toEqual([['chal', '123456']]);
+      expect(nav).toHaveBeenCalledWith('/workbench');
+    });
+
+    it('a wrong code shows the code message and does not navigate', () => {
+      const { c, nav, root, fixture } = enrol({ status: 401 });
+      c.enrolCode = '000000';
+      c.submitEnrolment();
+      fixture.detectChanges();
+      expect(root.querySelector('.error')?.textContent?.trim()).toBe('Incorrect or expired code. Check your authenticator app and try again.');
+      expect(nav).not.toHaveBeenCalled();
+    });
+
+    it('a failed enrolment start shows an error instead of a blank step', () => {
+      const { root } = enrol(undefined, { status: 401 });
+      expect(root.querySelector('#enrol-secret')).toBeNull();
+      expect(root.querySelector('.error')).toBeTruthy();
+    });
+  });
+
   describe('create account (owner sign-up, same as the old /buyer form)', () => {
     it('submits name, email and password to ownerRegister and goes to /listings', async () => {
       const registerCalls: unknown[] = [];

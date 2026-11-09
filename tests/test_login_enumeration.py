@@ -5,7 +5,7 @@ from app.services.auth import unusable_password_hash
 from tests.conftest import STRONG_PASSWORD
 
 USER_URL = "/api/v1/auth/login"
-INSTITUTION_URL = "/api/v1/auth/institution/login"
+INSTITUTION_URL = "/api/v1/auth/login"
 MAX_FAILURES = 5
 
 

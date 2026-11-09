@@ -1,5 +1,5 @@
 import { expect, Page, test } from '@playwright/test';
-import { GOOD_PASSWORD, makeUser } from './helpers';
+import { completeEnrolment, GOOD_PASSWORD, makeUser } from './helpers';
 
 // Workbench owner invite against the REAL backend: the officer never types or sees an owner password, gets a
 // one-time /accept-invite link instead, and the owner chooses their own password there.
@@ -10,6 +10,7 @@ async function signInOfficer(page: Page) {
   await page.locator('#login-email').fill(officer.email);
   await page.locator('#login-password').fill(officer.password);
   await page.getByRole('button', { name: 'Login' }).click();
+  await completeEnrolment(page);
   await expect(page).toHaveURL(/\/workbench$/);
 }
 

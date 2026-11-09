@@ -37,7 +37,7 @@ def _activate(client, token, password=NEW_PASSWORD):
 
 
 def _login(client, password=NEW_PASSWORD, email=EMAIL):
-    return client.post(f"{API}/auth/institution/login", json={"email": email, "password": password})
+    return client.post(f"{API}/auth/login", json={"email": email, "password": password})
 
 
 def _signed(session_factory, claims):
@@ -86,7 +86,7 @@ def test_token_for_existing_officer_with_password_is_rejected(client, officer, s
     token = issue_institution_invite_token(db, uuid.UUID(officer["institutionUser"]["id"]))
     db.close()
     assert _activate(client, token, "Another789!x").status_code == 401
-    ok = client.post(f"{API}/auth/institution/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD})
+    ok = client.post(f"{API}/auth/login", json={"email": "casey@example.com", "password": STRONG_PASSWORD})
     assert ok.status_code == 200
 
 

@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 
 import { ApiService } from './api.service';
 import { friendlyError } from './error-message';
-import { LoginResponse } from './models';
+import { LoginResponse, TotpEnrollment } from './models';
 
 @Component({
   selector: 'app-login-page',
@@ -18,6 +18,9 @@ export class LoginPageComponent {
   loginPassword = '';
   loginCode = '';
   challengeToken = ''; // set only after the password step asked for an authenticator code
+  enrolCode = '';
+  enrolChallengeToken = ''; // set only when the officer has no authenticator yet and must enrol
+  enrolment: TotpEnrollment | null = null;
 
   error = '';
   loading = false;
@@ -45,9 +48,37 @@ export class LoginPageComponent {
           this.loading = false;
           return;
         }
+        if ('enrolmentRequired' in res) {
+          this.startEnrolment(res.challengeToken);
+          return;
+        }
         this.finish(res);
       },
       error: (err) => this.fail(err),
+    });
+  }
+
+  private startEnrolment(challengeToken: string): void {
+    this.enrolChallengeToken = challengeToken;
+    this.api.enrolStart(challengeToken).subscribe({
+      next: (res) => {
+        this.enrolment = res;
+        this.loading = false;
+      },
+      error: (err) => {
+        this.enrolChallengeToken = '';
+        this.fail(err);
+      },
+    });
+  }
+
+  submitEnrolment(): void {
+    this.error = '';
+    this.loading = true;
+    const { enrolChallengeToken: challengeToken, enrolCode: code } = this; // the SUBMITTED values, even if edited while pending
+    this.api.enrolConfirm(challengeToken, code).subscribe({
+      next: (res) => this.finish(res),
+      error: (err) => this.fail(err, 'Incorrect or expired code. Check your authenticator app and try again.'),
     });
   }
 

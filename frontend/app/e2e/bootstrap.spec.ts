@@ -126,11 +126,12 @@ test('with no session /bootstrap shows the sign-in message and no form', async (
 });
 
 test('an officer (institution) session is not a platform admin: no form on /bootstrap', async ({ page }) => {
-  const { makeUser, fill } = await import('./helpers');
+  const { makeUser, fill, completeEnrolment } = await import('./helpers');
   const u = await makeUser('bootofficer');
   await page.goto('/login');
   await fill(page, u.email, u.password);
   await page.getByRole('button', { name: 'Login' }).click();
+  await completeEnrolment(page);
   await expect(page).toHaveURL(/\/workbench/);
   await page.goto('/bootstrap');
   await expect(page.locator('#signin-needed')).toBeVisible();

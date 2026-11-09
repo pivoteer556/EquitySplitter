@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { expect, Page, Request } from '@playwright/test';
-import { activate, ADMIN_EMAIL, ADMIN_PASSWORD, API } from './global-setup';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { activate, ADMIN_TOKEN_FILE, API } from './global-setup';
 
 export const LOGIN_API = '**/api/v1/auth/login';
 export const GOOD_PASSWORD = 'Str0ng!Passw0rd#1';
@@ -8,6 +9,23 @@ export const GOOD_PASSWORD = 'Str0ng!Passw0rd#1';
 export interface TestUser {
   email: string;
   password: string;
+}
+
+/**
+ * Calls the API as the e2e institution admin. Every use rotates that officer's token (the response carries the next
+ * one) and a password login now needs an authenticator code, so the current token lives in a file all workers share.
+ * A worker that read it just before another one used it gets a 401; callers retry.
+ */
+async function adminCall(path: string, body: unknown): Promise<Response> {
+  const token = readFileSync(ADMIN_TOKEN_FILE, 'utf8').trim();
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const next = res.headers.get('x-refreshed-token');
+  if (next) writeFileSync(ADMIN_TOKEN_FILE, next);
+  return res;
 }
 
 let counter = 0;
@@ -26,23 +44,8 @@ export async function makeUser(tag: string): Promise<TestUser> {
 }
 
 async function createUser(tag: string): Promise<TestUser> {
-  const login = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-  });
-  if (login.status !== 200) throw new Error(`admin login failed: ${login.status}`);
-  const { accessToken } = await login.json();
   const email = `${tag}-${process.pid}-${Date.now()}-${counter++}@e2e.example.com`.toLowerCase();
-  const res = await fetch(`${API}/institution-users`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({
-      institutionId: process.env['E2E_INSTITUTION_ID'],
-      name: `User ${tag}`,
-      email,
-    }),
-  });
+  const res = await adminCall('/institution-users', { institutionId: process.env['E2E_INSTITUTION_ID'], name: `User ${tag}`, email });
   if (res.status !== 201) throw new Error(`makeUser failed: ${res.status} ${await res.text()}`);
   const act = await activate((await res.json()).activationToken, GOOD_PASSWORD);
   if (act.status !== 200) throw new Error(`makeUser activation failed: ${act.status} ${await act.text()}`);
@@ -53,19 +56,8 @@ async function createUser(tag: string): Promise<TestUser> {
 export async function makePendingOfficer(tag: string): Promise<{ email: string; token: string }> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const login = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-      });
-      if (login.status !== 200) throw new Error(`admin login failed: ${login.status}`);
-      const { accessToken } = await login.json();
       const email = `${tag}-${process.pid}-${Date.now()}-${counter++}@e2e.example.com`.toLowerCase();
-      const res = await fetch(`${API}/institution-users`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ institutionId: process.env['E2E_INSTITUTION_ID'], name: `User ${tag}`, email }),
-      });
+      const res = await adminCall('/institution-users', { institutionId: process.env['E2E_INSTITUTION_ID'], name: `User ${tag}`, email });
       if (res.status !== 201) throw new Error(`makePendingOfficer failed: ${res.status} ${await res.text()}`);
       return { email, token: (await res.json()).activationToken };
     } catch (e) {
@@ -118,20 +110,27 @@ export function totpCode(secretBase32: string, offset = 0): string {
   return String((mac.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, '0');
 }
 
-/** Makes an officer and enrols + confirms TOTP through the real API. Returns the secret. The confirming code is spent. */
+/** Makes an officer and enrols + confirms TOTP through the real API (first sign-in flow). Returns the secret. The confirming code is spent. */
 export async function makeTotpOfficer(tag: string): Promise<TestUser & { secret: string }> {
   const user = await makeUser(tag);
-  const login = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(user),
-  });
-  const { accessToken } = await login.json(); // no credential yet, so this is still a plain token
-  const auth = { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` };
-  const enroll = await fetch(`${API}/auth/institution/totp/enroll`, { method: 'POST', headers: auth });
-  if (enroll.status !== 200) throw new Error(`enroll failed: ${enroll.status}`);
-  const { secret } = await enroll.json();
-  const confirm = await fetch(`${API}/auth/institution/totp/confirm`, { method: 'POST', headers: auth, body: JSON.stringify({ code: totpCode(secret) }) });
-  if (confirm.status !== 204) throw new Error(`confirm failed: ${confirm.status} ${await confirm.text()}`);
+  const post = (path: string, body: unknown) =>
+    fetch(`${API}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const login = await post('/auth/login', user);
+  const { challengeToken, enrolmentRequired } = await login.json(); // no credential yet, so this is the enrolment challenge
+  if (!enrolmentRequired) throw new Error(`expected an enrolment challenge: ${login.status}`);
+  const start = await post('/auth/login/totp/enroll-start', { challengeToken });
+  if (start.status !== 200) throw new Error(`enroll-start failed: ${start.status}`);
+  const { secret } = await start.json();
+  const confirm = await post('/auth/login/totp/enroll-confirm', { challengeToken, code: totpCode(secret) });
+  if (confirm.status !== 200) throw new Error(`enroll-confirm failed: ${confirm.status} ${await confirm.text()}`);
   return { ...user, secret };
+}
+
+/** UI: after Login on a never-enrolled officer, completes the enrolment step with a real code. Returns the secret. */
+export async function completeEnrolment(page: Page): Promise<string> {
+  await expect(page.locator('#enrol-secret')).toBeVisible();
+  const secret = (await page.locator('#enrol-secret').innerText()).trim();
+  await page.locator('#enrol-code').fill(totpCode(secret));
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
+  return secret;
 }

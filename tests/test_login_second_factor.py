@@ -106,14 +106,14 @@ def test_malformed_code_is_rejected(client, enrolled):
         assert client.post(LOGIN_TOTP, json={"challengeToken": token, "code": bad}).status_code == 422, bad
 
 
-def test_officer_without_a_confirmed_credential_signs_in_as_before(client, officer):
+def test_officer_without_a_confirmed_credential_gets_the_enrolment_challenge_not_a_token(client, officer):
     body = _password_step(client).json()
-    assert body["accessToken"] and "challengeToken" not in body and "secondFactorRequired" not in body
+    assert body["enrolmentRequired"] is True and "accessToken" not in body and "secondFactorRequired" not in body
 
 
 def test_pending_unconfirmed_enrolment_does_not_trigger_the_second_step(client, officer):
     client.post(ENROLL, headers=bearer(officer["accessToken"]))
-    assert "accessToken" in _password_step(client).json()
+    assert _password_step(client).json()["enrolmentRequired"] is True
 
 
 def test_plain_user_signs_in_as_before(client):

@@ -80,6 +80,19 @@ export interface SecondFactorChallenge {
   challengeToken: string;
 }
 
+/** POST /auth/login answer for an officer with no authenticator yet: no token, only a challenge for the enrolment endpoints. */
+export interface EnrolmentChallenge {
+  userType: 'institution_user';
+  enrolmentRequired: true;
+  challengeToken: string;
+}
+
+/** POST /auth/login/totp/enroll-start answer: the secret to type into an authenticator app, and the same as an otpauth link. */
+export interface TotpEnrollment {
+  secret: string;
+  otpauthUri: string;
+}
+
 export interface InstitutionBootstrapResponse {
   institution: Institution;
   institutionUser: InstitutionUser;

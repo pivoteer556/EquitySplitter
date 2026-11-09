@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import Principal, platform_admin_principal, require_institution_user
+from app.api.routes.totp import TotpEnrollment
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import InstitutionUser, TokenRevocation, TotpCredential, User
@@ -15,6 +16,9 @@ from app.schemas.auth import (
     AuthLoginRequest,
     AuthRegisterRequest,
     AuthTokenResponse,
+    EnrolConfirmRequest,
+    EnrolmentChallenge,
+    EnrolStartRequest,
     InstitutionBootstrapRequest,
     InstitutionBootstrapResponse,
     InstitutionRevokeRequest,
@@ -23,6 +27,7 @@ from app.schemas.auth import (
     SecondFactorChallenge,
 )
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
+from app.services import auth as auth_service  # module access, so the test clock patch applies
 from app.services import totp
 from app.services.auth import (
     accept_invite,
@@ -41,6 +46,8 @@ from app.services.auth import (
 from app.services.rate_limit import RateLimiter, login_limiter, signup_limiter
 
 router = APIRouter(prefix="/auth")
+
+ENROLMENT_PURPOSE = "enrolment_challenge"  # token purpose; see issue_login_challenge_token
 
 
 def _client_ip(request: Request) -> str:
@@ -163,7 +170,7 @@ def _confirmed_credential(db: Session, officer_id: UUID) -> TotpCredential | Non
     )
 
 
-@router.post("/login", response_model=LoginResponse | SecondFactorChallenge)
+@router.post("/login", response_model=LoginResponse | SecondFactorChallenge | EnrolmentChallenge)
 def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
     key = _login_key("login", request, payload.email)  # one budget per ip+email, whichever kind of account it is
     _enforce_login_limit(db, key)
@@ -174,15 +181,10 @@ def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get
         # Password proven, session not issued yet. The budget is NOT reset here: only a finished sign-in clears it,
         # so a stolen password cannot be used to keep wiping the counter while guessing codes.
         return SecondFactorChallenge(challengeToken=issue_login_challenge_token(db, account.id))
-    login_limiter.reset(db, key)
     if isinstance(account, InstitutionUser):
-        return LoginResponse(
-            accessToken=refresh_and_store_institution_token(db, account),
-            userType="institution_user",
-            isPlatformAdmin=False,
-            role=account.role,
-            institutionId=account.institutionId,
-        )
+        # No authenticator yet: the password alone never signs an officer in. Same budget rule as above.
+        return EnrolmentChallenge(challengeToken=issue_login_challenge_token(db, account.id, ENROLMENT_PURPOSE))
+    login_limiter.reset(db, key)
     return LoginResponse(
         accessToken=refresh_and_store_user_token(db, account),
         userType="user",
@@ -195,17 +197,7 @@ def login_totp(payload: LoginTotpRequest, request: Request, db: Session = Depend
     """Second sign-in step. Every failure is the same 401 as a bad password and counts toward the same "login"
     budget (keyed by ip+email, so the password step and the code step share one limit)."""
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    try:
-        claims = decode_token(db, payload.challengeToken)
-    except HTTPException:
-        raise invalid from None
-    # decode_token cannot tell token types apart: an access token must not pass as a challenge.
-    officer = None
-    if claims.get("userType") == "login_challenge":
-        try:
-            officer = db.get(InstitutionUser, UUID(claims["sub"]))
-        except (KeyError, ValueError):
-            officer = None
+    officer = _officer_from_challenge(db, payload.challengeToken, "login_challenge")
     if officer is None:
         # A forged challenge is impossible (signed) so there is no email to charge; nothing to count against.
         raise invalid
@@ -221,13 +213,74 @@ def login_totp(payload: LoginTotpRequest, request: Request, db: Session = Depend
         _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     credential.lastUsedStep = step  # single use: the same or an older code is a replay next time
     login_limiter.reset(db, key)
+    return _officer_login_response(db, officer)  # commits lastUsedStep with the session iat
+
+
+def _officer_from_challenge(db: Session, token: str, purpose: str) -> InstitutionUser | None:
+    """The officer a challenge token names, or None for anything else. decode_token cannot tell token types apart,
+    so the purpose is checked here: an access token or the other kind of challenge must not pass."""
+    try:
+        claims = decode_token(db, token)
+    except HTTPException:
+        return None
+    if claims.get("userType") != purpose:
+        return None
+    try:
+        return db.get(InstitutionUser, UUID(claims["sub"]))
+    except (KeyError, ValueError):
+        return None
+
+
+def _officer_login_response(db: Session, officer: InstitutionUser) -> LoginResponse:
     return LoginResponse(
-        accessToken=refresh_and_store_institution_token(db, officer),  # commits lastUsedStep with the session iat
+        accessToken=refresh_and_store_institution_token(db, officer),
         userType="institution_user",
         isPlatformAdmin=False,
         role=officer.role,
         institutionId=officer.institutionId,
     )
+
+
+@router.post("/login/totp/enroll-start", response_model=TotpEnrollment)
+def login_totp_enroll_start(payload: EnrolStartRequest, request: Request, db: Session = Depends(get_db)):
+    """First sign-in, step 2a: start (or restart, until confirmed) enrolment with the enrolment challenge instead of a
+    bearer. An already-enrolled officer, or any other token, gets the generic 401."""
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    officer = _officer_from_challenge(db, payload.challengeToken, ENROLMENT_PURPOSE)
+    if officer is None or _confirmed_credential(db, officer.id) is not None:
+        raise invalid
+    _enforce_login_limit(db, _login_key("login", request, officer.email))
+    secret = totp.new_secret()
+    credential = db.query(TotpCredential).filter(TotpCredential.institutionUserId == officer.id).first()
+    if credential is None:
+        db.add(TotpCredential(institutionUserId=officer.id, secretEncrypted=totp.encrypt_secret(secret)))
+    else:
+        credential.secretEncrypted = totp.encrypt_secret(secret)  # replaces the pending (unconfirmed) one
+    db.commit()
+    return TotpEnrollment(secret=secret, otpauthUri=totp.provisioning_uri(secret, officer.email))
+
+
+@router.post("/login/totp/enroll-confirm", response_model=LoginResponse)
+def login_totp_enroll_confirm(payload: EnrolConfirmRequest, request: Request, db: Session = Depends(get_db)):
+    """First sign-in, step 2b: prove the authenticator works. Failures are the generic 401 and count toward the shared
+    "login" budget, exactly like a wrong code at /login/totp."""
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    officer = _officer_from_challenge(db, payload.challengeToken, ENROLMENT_PURPOSE)
+    if officer is None:
+        raise invalid
+    key = _login_key("login", request, officer.email)
+    _enforce_login_limit(db, key)
+    credential = db.query(TotpCredential).filter(TotpCredential.institutionUserId == officer.id).first()
+    step = None
+    if credential is not None and credential.confirmedAt is None:  # confirmed officers cannot re-enrol this way
+        secret = totp.decrypt_secret(credential.secretEncrypted)
+        step = totp.verify_code(secret, payload.code, auth_service.now_utc_seconds(), None)
+    if credential is None or step is None:
+        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    credential.confirmedAt = datetime.now(UTC)
+    credential.lastUsedStep = step
+    login_limiter.reset(db, key)
+    return _officer_login_response(db, officer)  # commits the credential with the session iat
 
 
 @router.post("/accept-invite", response_model=AuthTokenResponse)
@@ -241,21 +294,6 @@ def accept_invite_route(payload: AcceptInviteRequest, request: Request, db: Sess
 def institution_activate(payload: AcceptInviteRequest, request: Request, db: Session = Depends(get_db)):
     _enforce_signup_limit(db, request, scope="institution-activate")
     _, token = activate_institution_user(db, payload.token, payload.password)
-    return AuthTokenResponse(accessToken=token)
-
-
-@router.post("/institution/login", response_model=AuthTokenResponse)
-def institution_login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
-    key = _login_key("login", request, payload.email)  # shared with /login so the two cannot double the budget
-    _enforce_login_limit(db, key)
-    inst_user = db.query(InstitutionUser).filter(InstitutionUser.email == payload.email).first()
-    if inst_user is None or inst_user.passwordHash is None:
-        burn_password_check(payload.password)
-        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
-    if not verify_and_upgrade_password(db, inst_user, payload.password):
-        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
-    login_limiter.reset(db, key)
-    token = refresh_and_store_institution_token(db, inst_user)
     return AuthTokenResponse(accessToken=token)
 
 

@@ -60,6 +60,23 @@ class SecondFactorChallenge(BaseModel):
     challengeToken: str
 
 
+class EnrolmentChallenge(BaseModel):
+    """Returned by POST /auth/login instead of a token when the officer has no confirmed authenticator yet. The
+    challengeToken only works at POST /auth/login/totp/enroll-start and /enroll-confirm."""
+
+    userType: Literal["institution_user"] = "institution_user"
+    enrolmentRequired: Literal[True] = True
+    challengeToken: str
+
+
+class EnrolStartRequest(BaseModel):
+    challengeToken: str
+
+
+class EnrolConfirmRequest(EnrolStartRequest):
+    code: str = Field(pattern=r"^\d{6}$")
+
+
 class LoginTotpRequest(BaseModel):
     challengeToken: str
     code: str = Field(pattern=r"^\d{6}$")

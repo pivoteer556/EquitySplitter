@@ -131,14 +131,16 @@ def issue_institution_invite_token(db: Session, institution_user_id: UUID) -> st
     return jwt.encode(claims, ensure_secret_state(db).currentSecret, algorithm="HS256")
 
 
-def issue_login_challenge_token(db: Session, institution_user_id: UUID) -> str:
+def issue_login_challenge_token(db: Session, institution_user_id: UUID, purpose: str = "login_challenge") -> str:
     """Stateless proof that the password step passed, redeemable only at POST /auth/login/totp. userType=
     "login_challenge" keeps it out of every auth dependency (they accept only user/institution_user). It is not
-    single-use by itself: the one-time TOTP code is what cannot be replayed, and wrong codes are rate limited."""
+    single-use by itself: the one-time TOTP code is what cannot be replayed, and wrong codes are rate limited.
+    `purpose` "enrolment_challenge" is the same proof for an officer with no authenticator yet; the two purposes are
+    not interchangeable (each endpoint checks its own)."""
     iat_dt = now_utc_seconds()
     claims = {
         "sub": str(institution_user_id),
-        "userType": "login_challenge",
+        "userType": purpose,
         "iat": int(iat_dt.timestamp()),
         "exp": int((iat_dt + timedelta(minutes=LOGIN_CHALLENGE_MINUTES)).timestamp()),
     }
