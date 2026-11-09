@@ -199,6 +199,29 @@ def accept_invite(db: Session, token: str, password: str) -> tuple[User, str]:
     return user, refresh_and_store_user_token(db, user)  # commits the hash and the session iat together
 
 
+def create_platform_admin(db: Session, email: str) -> str:
+    """Operator-only (no endpoint calls this). Create a password-less platform admin, or re-issue the link for an
+    existing one, and return a one-time set-password token from the SAME generator as owner invites
+    (issue_invite_token, redeemed at accept-invite). Never sets or changes a password; refuses to promote an
+    ordinary account."""
+    email = email.strip()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        user = User(
+            name="Platform Admin",
+            email=email,
+            passwordHash=unusable_password_hash(),
+            passwordSetAt=None,
+            isPlatformAdmin=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    elif not user.isPlatformAdmin:
+        raise ValueError("An ordinary account with this email already exists; it will not be promoted")
+    return issue_invite_token(db, user.id)
+
+
 def refresh_and_store_institution_token(db: Session, inst_user: InstitutionUser) -> str:
     token = issue_token(db, inst_user.id, "institution_user", institution_id=inst_user.institutionId)
     claims = decode_token(db, token)

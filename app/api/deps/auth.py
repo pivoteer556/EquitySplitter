@@ -53,6 +53,19 @@ def _user_principal(response: Response, db: Session, claims: dict) -> Principal:
     return Principal(user_id=user.id, user_type="user")
 
 
+def platform_admin_principal(response: Response, db: Session, authorization: str | None) -> Principal:
+    """A signed-in platform admin (a "user" session whose account has isPlatformAdmin). Raises HTTPException on any
+    failure; callers that must not leak why (bootstrap) map every failure to one response. The admin flag is checked
+    BEFORE the session token is rotated, so a rejected caller never has their stored session replaced."""
+    claims = decode_token(db, _extract_bearer(authorization))
+    if claims.get("userType") != "user":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
+    user = db.query(User).filter(User.id == UUID(claims["sub"])).first()
+    if user is None or not user.isPlatformAdmin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a platform admin")
+    return _user_principal(response, db, claims)
+
+
 def require_institution_user(
     response: Response,
     authorization: str | None = Header(default=None),

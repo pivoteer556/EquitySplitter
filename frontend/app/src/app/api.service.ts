@@ -34,11 +34,16 @@ export class ApiService {
     officerName: string;
     officerEmail: string;
   }, setupToken: string): Observable<InstitutionBootstrapResponse> {
-    // No session comes back: the officer sets a password by opening the activation link.
-    // The server's BOOTSTRAP_TOKEN gate: sent per request, never stored.
-    return this.http.post<InstitutionBootstrapResponse>(`${this.baseUrl}/auth/institution/bootstrap`, payload, {
-      headers: { 'X-Bootstrap-Token': setupToken },
-    });
+    // No session comes back for the officer: they set a password by opening the activation link.
+    // Two-part gate: the server's BOOTSTRAP_TOKEN (sent per request, never stored) plus the signed-in platform admin's
+    // user token. The server rotates that session on success, so keep the refreshed token.
+    const headers: Record<string, string> = { 'X-Bootstrap-Token': setupToken };
+    if (this.userToken) {
+      headers['Authorization'] = `Bearer ${this.userToken}`;
+    }
+    return this.http
+      .post<InstitutionBootstrapResponse>(`${this.baseUrl}/auth/institution/bootstrap`, payload, { observe: 'response', headers })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'user')));
   }
 
   activateInstitutionUser(token: string, password: string): Observable<AuthTokenResponse> {

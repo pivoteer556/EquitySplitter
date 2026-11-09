@@ -51,6 +51,43 @@ describe('ApiService base URL', () => {
     http.verify();
   });
 
+  it('bootstrap sends the signed-in user token as the bearer and stores the rotated token, never in the body', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ApiService);
+    const http = TestBed.inject(HttpTestingController);
+    api.clearTokens();
+    api.setUserToken('admin-jwt');
+
+    api.bootstrapInstitution({ institutionName: 'I', officerName: 'O', officerEmail: 'o@e.com' }, 'setup-tok').subscribe();
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/auth/institution/bootstrap`);
+    expect(req.request.headers.get('Authorization')).toBe('Bearer admin-jwt');
+    expect(req.request.headers.get('X-Bootstrap-Token')).toBe('setup-tok');
+    expect(JSON.stringify(req.request.body)).not.toContain('admin-jwt');
+    expect(JSON.stringify(req.request.body)).not.toContain('setup-tok');
+    req.flush(
+      { institution: { id: 'i1' }, institutionUser: {}, activationToken: 't', activationPath: '/activate#token=t' },
+      { headers: { 'X-Refreshed-Token': 'admin-jwt-2' } },
+    );
+    expect(api.getUserToken()).toBe('admin-jwt-2');
+    api.clearTokens();
+    http.verify();
+  });
+
+  it('bootstrap with no session sends no Authorization header', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ApiService);
+    const http = TestBed.inject(HttpTestingController);
+    api.clearTokens();
+
+    api.bootstrapInstitution({ institutionName: 'I', officerName: 'O', officerEmail: 'o@e.com' }, 'setup-tok').subscribe({ error: () => undefined });
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/auth/institution/bootstrap`);
+    expect(req.request.headers.has('Authorization')).toBeFalse();
+    req.flush({}, { status: 404, statusText: 'Not Found' });
+    http.verify();
+  });
+
   it('activate posts token and password and stores the institution session', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const api = TestBed.inject(ApiService);

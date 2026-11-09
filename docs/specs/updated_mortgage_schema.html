@@ -1,4 +1,4 @@
-<!-- Synced with the code on 2026-11-07: models in app/models, migrations 0001-0010 in alembic/versions.
+<!-- Synced with the code on 2026-11-07: models in app/models, migrations 0001-0011 in alembic/versions.
      Before this sync the diagram still showed the retired OWNERSHIP table and sharePct/maxOwnershipPct names.
      0002 auth columns, tokenRevocations, authSecretState, uniqueness and immutability triggers; 0003 passwordHash widened to 255;
      0004 rateLimitHits; 0005 passwordHash NOT NULL and users.passwordSetAt; 0006 loans (property loan columns are
@@ -6,8 +6,9 @@
      0007 connectionRequests (buyer asks a professional about a pending property; 2026-11-07);
      0008 institutionUsers.passwordSetAt (NULL until an officer activates; existing rows backfilled; 2026-11-08);
      0009 propertyListings (marketing data, many per property, at most one 'listed' via a partial unique index; 2026-11-08);
-     0010 totpCredentials (authenticator-app secret per institution user, encrypted; 2026-11-08). -->
-<p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0010 on 2026-11-08. The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
+     0010 totpCredentials (authenticator-app secret per institution user, encrypted; 2026-11-08);
+     0011 users.isPlatformAdmin (boolean NOT NULL default false; platform admin = a users row with no institution; 2026-11-09). -->
+<p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0011 on 2026-11-09 (0011 adds USER.isPlatformAdmin, the platform admin account kind that gates institution bootstrap; no institution link). The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
 
 <div id="erd"></div>
 <style>
@@ -53,6 +54,7 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     string email UK
     string passwordHash "NOT NULL, argon2id"
     timestamptz passwordSetAt "NULL while invited"
+    boolean isPlatformAdmin "NOT NULL, default false"
     string passwordSalt "legacy, nullable"
     timestamptz lastTokenIssuedAt
     timestamptz createdAt

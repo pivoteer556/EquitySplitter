@@ -31,10 +31,11 @@ def test_register_is_limited_per_ip(client):
     assert int(blocked.headers["Retry-After"]) >= 1
 
 
-def test_bootstrap_is_limited_per_ip(client):
+def test_bootstrap_is_limited_per_ip(client, platform_admin):
+    headers = {**platform_admin, **BOOTSTRAP_HEADERS}
     for i in range(MAX_SIGNUPS):
-        assert _bootstrap(client, i).status_code == 201
-    assert _bootstrap(client, 99).status_code == 429
+        assert _bootstrap(client, i, headers).status_code == 201
+    assert _bootstrap(client, 99, headers).status_code == 429
 
 
 def test_register_and_bootstrap_share_one_budget(client):

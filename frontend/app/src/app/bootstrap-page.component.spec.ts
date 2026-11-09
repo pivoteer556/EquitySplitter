@@ -5,9 +5,12 @@ import { of, throwError } from 'rxjs';
 import { ApiService } from './api.service';
 import { BootstrapPageComponent } from './bootstrap-page.component';
 
+const NOT_ACCEPTED = 'Not accepted. Sign in as platform admin and check the setup token.';
+
 describe('BootstrapPageComponent', () => {
-  function setup(err: unknown, bootstrapCalls: Record<string, string>[] = []) {
+  function setup(err: unknown, bootstrapCalls: Record<string, string>[] = [], session = 'admin-jwt') {
     const api = {
+      getUserToken: () => session,
       bootstrapInstitution: (payload: Record<string, string>) => {
         bootstrapCalls.push(payload);
         return err === undefined
@@ -63,6 +66,33 @@ describe('BootstrapPageComponent', () => {
     expect(el?.textContent?.trim()).toBe(
       "Can't reach the server. Check your connection and try again.",
     );
+  });
+
+  describe('without a session', () => {
+    it('shows the sign-in message with a link to sign in and no form, and sends nothing', () => {
+      const calls: Record<string, string>[] = [];
+      const fixture = setup(undefined, calls, '');
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelector('#bootstrap-form')).toBeNull();
+      expect(root.querySelector('input[name="setupToken"]')).toBeNull();
+      expect(root.querySelector('#signin-needed')?.textContent).toContain('Sign in as platform admin');
+      expect(root.querySelector('#signin-needed a')?.getAttribute('href')).toBe('/buyer');
+      fixture.componentInstance.bootstrapInstitution();
+      expect(calls.length).toBe(0);
+    });
+  });
+
+  it('with a session shows the form and no sign-in message', () => {
+    const root = setup(undefined).nativeElement as HTMLElement;
+    expect(root.querySelector('#bootstrap-form')).toBeTruthy();
+    expect(root.querySelector('#signin-needed')).toBeNull();
+  });
+
+  it('on 404 also offers the sign-in link', () => {
+    const fixture = setup({ status: 404, error: { detail: 'Not found' } });
+    fixture.componentInstance.bootstrapInstitution();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.error + p a')?.getAttribute('href')).toBe('/buyer');
   });
 
   describe('bootstrap form', () => {
@@ -125,7 +155,7 @@ describe('BootstrapPageComponent', () => {
       await fixture.whenStable();
       await new Promise((r) => setTimeout(r)); // ngModel writes the cleared value to the DOM in a later microtask
       const root = fixture.nativeElement as HTMLElement;
-      expect(root.querySelector('.error')?.textContent?.trim()).toBe('Setup token not accepted.');
+      expect(root.querySelector('.error')?.textContent?.trim()).toBe(NOT_ACCEPTED);
       expect(root.querySelector('.activation')).toBeNull();
       expect(fixture.componentInstance.setupToken).toBe('');
       expect(token.value).toBe('');

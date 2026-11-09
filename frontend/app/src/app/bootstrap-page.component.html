@@ -4,6 +4,11 @@
     <h1>Bootstrap New Institution</h1>
   </header>
 
+  @if (!signedIn) {
+    <p id="signin-needed">
+      Creating an institution requires a signed-in platform admin. <a routerLink="/buyer">Sign in as platform admin</a>, then come back to this page.
+    </p>
+  } @else {
   <section>
     <p id="setup-note">Creating an institution requires a setup token from the platform administrator.</p>
     <form id="bootstrap-form" (ngSubmit)="bootstrapInstitution()" ngNativeValidate>
@@ -23,8 +28,10 @@
       </div>
     }
   </section>
+  }
 
   @if (error) {
     <pre class="error" role="alert">{{ error }}</pre>
+    <p><a routerLink="/buyer">Sign in as platform admin</a></p>
   }
 </div>

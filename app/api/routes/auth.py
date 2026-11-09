@@ -3,10 +3,10 @@ from datetime import UTC, datetime
 from typing import NoReturn
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_institution_user
+from app.api.deps.auth import Principal, platform_admin_principal, require_institution_user
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import InstitutionUser, TokenRevocation, User
@@ -82,6 +82,7 @@ def _enforce_signup_limit(db: Session, request: Request, scope: str = "signup") 
 def institution_bootstrap(
     payload: InstitutionBootstrapRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     x_bootstrap_token: str | None = Header(default=None),
 ):
@@ -92,6 +93,13 @@ def institution_bootstrap(
     # Bytes, because compare_digest rejects non-ASCII str.
     if not expected or not hmac.compare_digest((x_bootstrap_token or "").encode(), expected.encode()):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    # Second factor of the gate: a signed-in platform admin. Every failure (no/garbage/expired bearer, wrong account
+    # kind) is the same 404 as a bad setup token. Checked after the token so only token holders touch sessions.
+    try:
+        # Authorization is read from the request (not a parameter) to stay within the argument-count lint.
+        platform_admin_principal(response, db, request.headers.get("authorization"))
+    except (HTTPException, ValueError, KeyError):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from None
     institution, officer, token = bootstrap_institution(
         db,
         payload.institutionName,

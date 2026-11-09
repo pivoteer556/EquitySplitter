@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from '@playwright/test';
-import { BOOTSTRAP_TOKEN } from './e2e/constants';
+import { BOOTSTRAP_TOKEN, E2E_DATABASE_URL } from './e2e/constants';
 
 // Browser: an already-installed one (no Playwright browser download). Locally Microsoft Edge ('msedge');
 // CI can set E2E_BROWSER_CHANNEL=chrome, or E2E_BROWSER_PATH=<executable>.
@@ -17,7 +17,7 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(apiBase)) {
 const repoRoot = resolve(__dirname, '..', '..');
 // Local default is the Windows venv; CI sets E2E_PYTHON=python (the setup-python interpreter).
 const python = process.env['E2E_PYTHON'] ?? resolve(repoRoot, '.venv', 'Scripts', 'python.exe');
-const databaseUrl = 'postgresql+psycopg://postgres:postgres@localhost:55432/equity_e2e';
+const databaseUrl = E2E_DATABASE_URL;
 
 export default defineConfig({
   testDir: './e2e',

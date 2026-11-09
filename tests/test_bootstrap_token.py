@@ -11,8 +11,8 @@ def _post(client, headers=None):
     return client.post(URL, json=BODY, headers=headers)
 
 
-def test_right_token_bootstraps(client):
-    resp = _post(client, BOOTSTRAP_HEADERS)
+def test_right_token_bootstraps(client, platform_admin):
+    resp = _post(client, {**platform_admin, **BOOTSTRAP_HEADERS})
     assert resp.status_code == 201
     assert resp.json()["activationToken"]
 

@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -74,13 +75,19 @@ def client(session_factory):
     app.dependency_overrides.clear()
 
 
-def bootstrap_officer(client, institution_name, officer_name, officer_email):
+def bootstrap_officer(client, institution_name, officer_name, officer_email, admin_headers=None):
     """Bootstrap an institution and activate its first officer (bootstrap gives no session, only an activation link).
-    Returns the bootstrap body plus the activated officer's `accessToken`, so callers keep their old shape."""
+    Bootstrap needs a signed-in platform admin: pass `admin_headers`, or one is created here (named after the officer
+    email so several institutions can be bootstrapped in one test). Returns the bootstrap body plus the activated
+    officer's `accessToken`, so callers keep their old shape."""
+    if admin_headers is None:
+        # The client fixture's get_db override yields a session on the test database.
+        session_factory = contextmanager(app.dependency_overrides[get_db])
+        admin_headers = make_platform_admin(client, session_factory, f"root-{officer_email}")
     resp = client.post(
         "/api/v1/auth/institution/bootstrap",
         json={"institutionName": institution_name, "officerName": officer_name, "officerEmail": officer_email},
-        headers=BOOTSTRAP_HEADERS,
+        headers={**admin_headers, **BOOTSTRAP_HEADERS},
     )
     assert resp.status_code == 201, resp.text
     body = resp.json()
@@ -95,3 +102,23 @@ def bootstrap_officer(client, institution_name, officer_name, officer_email):
 def officer(client):
     """Bootstrap and activate an institution; returns the response body plus accessToken (password STRONG_PASSWORD)."""
     return bootstrap_officer(client, "Atlas Lending", "Casey Officer", "casey@example.com")
+
+
+def make_platform_admin(client, session_factory, email="root@example.com"):
+    """Create a platform admin the way the operator script does (invite link), set its password through the
+    accept-invite endpoint and return (auth headers, accessToken). Password is STRONG_PASSWORD."""
+    from app.services.auth import create_platform_admin  # imported here so unrelated tests never need it
+
+    with session_factory() as db:
+        invite = create_platform_admin(db, email)
+    resp = client.post("/api/v1/auth/accept-invite", json={"token": invite, "password": STRONG_PASSWORD})
+    assert resp.status_code == 200, resp.text
+    token = resp.json()["accessToken"]
+    return bearer(token)
+
+
+@pytest.fixture()
+def platform_admin(client, session_factory):
+    """Auth headers ({"Authorization": "Bearer ..."}) of a signed-in platform admin. Send them together with
+    BOOTSTRAP_HEADERS to reach POST /auth/institution/bootstrap: `headers={**platform_admin, **BOOTSTRAP_HEADERS}`."""
+    return make_platform_admin(client, session_factory)

@@ -40,11 +40,28 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
 - **CORS** — `http://localhost:4200` and `http://127.0.0.1:4200` are always allowed. Set `CORS_ALLOW_ORIGINS` to a
   comma-separated list of extra origins (e.g. `https://site.example.net,https://other.example`) to allow a deployed
   frontend. Whitespace, empty entries, trailing slashes and `*` are ignored.
-- **Bootstrap setup token** — `POST /auth/institution/bootstrap` (creating an institution) requires the header
-  `X-Bootstrap-Token` to equal the `BOOTSTRAP_TOKEN` setting (constant-time compare). Leave `BOOTSTRAP_TOKEN` empty to
-  disable the endpoint. A missing token, a wrong one and a disabled endpoint all return the same `404 Not found`, so
-  the endpoint is not discoverable and a response never says which case it was; every attempt counts against the
-  signup rate limit. Not yet wired into the Azure deployment or the frontend form (planned, BACKLOG 2g steps 2-3).
+- **Bootstrap gate: setup token AND platform admin** — `POST /auth/institution/bootstrap` (creating an institution)
+  requires BOTH the header `X-Bootstrap-Token` equal to the `BOOTSTRAP_TOKEN` setting (constant-time compare) AND an
+  `Authorization: Bearer` token of a signed-in platform admin (a `users` row with `isPlatformAdmin` true and no
+  institution; a normal user token from `POST /auth/login`). Leave `BOOTSTRAP_TOKEN` empty to disable the endpoint. A
+  disabled endpoint, a missing or wrong token, and a missing, bad, expired or non-admin bearer all return the same
+  `404 Not found`, so the endpoint is not discoverable and a response never says which check failed; the checks run in
+  the order rate limit, setup token, admin bearer, and every attempt counts against the signup rate limit. On success
+  the admin's session rotates (`X-Refreshed-Token`). Nothing public creates or promotes a platform admin, and
+  `/auth/register` ignores `isPlatformAdmin`. The Terraform setup token (`terraform output -raw bootstrap_token`) is
+  still required in addition to the admin. Known limits: ordinary accounts cannot be promoted; a platform admin who is
+  locked out has no recovery until the password-reset flow exists (BACKLOG 2l); the script does not validate email
+  format; migration 0011 has no test with pre-existing rows. Until the unified login (BACKLOG 2n step 3) the admin signs
+  in on the user sign-in at `/buyer`, then opens `/bootstrap` by URL.
+- **Creating the first platform admin (operator)** — nobody can sign in to create the first admin, so an operator runs
+  `python -m scripts.create_platform_admin <email>` with `DATABASE_URL` pointing at the target database (apply
+  migrations first, `alembic upgrade head`). The script takes no password and prints a one-time
+  `/accept-invite#token=...` link (7 days, single use, same generator as owner invites); open it on the frontend and set
+  a password, then sign in. It exits 1 for an email that already belongs to an ordinary account (no promotion). Running
+  it again for an admin who already set a password prints a link that `accept-invite` refuses (single use) and a note
+  on stderr. For the live Azure database the user runs it (or the agent asks first): one possible route is
+  `az containerapp exec` into the running app, which is UNVERIFIED and has not been tried. IMPORTANT after the deploy
+  that ships this: no live bootstrap is possible until the operator has created the first platform admin.
 - Invited owners start without a password. When the invitee has none, `POST /properties/{id}/owners` returns an
   `inviteToken` (re-inviting issues a fresh one); the loan officer hands it over out-of-band and the invitee POSTs
   `{token, password}` to `/auth/accept-invite` to set a password and get an access token. Tokens expire after 7 days

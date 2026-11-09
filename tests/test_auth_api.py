@@ -10,8 +10,8 @@ def _bootstrap_body(**extra):
     return {**base, **extra}
 
 
-def test_bootstrap_returns_activation_link_and_no_session(client):
-    resp = client.post(BOOTSTRAP, json=_bootstrap_body(), headers=BOOTSTRAP_HEADERS)
+def test_bootstrap_returns_activation_link_and_no_session(client, platform_admin):
+    resp = client.post(BOOTSTRAP, json=_bootstrap_body(), headers={**platform_admin, **BOOTSTRAP_HEADERS})
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["activationPath"] == f"/activate#token={body['activationToken']}"
@@ -21,10 +21,10 @@ def test_bootstrap_returns_activation_link_and_no_session(client):
     assert "passwordHash" not in resp.text and "password" not in body["institutionUser"]
 
 
-def test_bootstrap_officer_cannot_log_in_until_activated(client, session_factory):
+def test_bootstrap_officer_cannot_log_in_until_activated(client, session_factory, platform_admin):
     from app.models import InstitutionUser
 
-    body = client.post(BOOTSTRAP, json=_bootstrap_body(), headers=BOOTSTRAP_HEADERS).json()
+    body = client.post(BOOTSTRAP, json=_bootstrap_body(), headers={**platform_admin, **BOOTSTRAP_HEADERS}).json()
     db = session_factory()
     row = db.query(InstitutionUser).one()
     assert row.passwordSetAt is None
@@ -41,13 +41,21 @@ def test_bootstrap_officer_cannot_log_in_until_activated(client, session_factory
     db.close()
 
 
-def test_bootstrap_rejects_a_sent_password(client):
-    resp = client.post(BOOTSTRAP, json=_bootstrap_body(officerPassword=STRONG_PASSWORD), headers=BOOTSTRAP_HEADERS)
+def test_bootstrap_rejects_a_sent_password(client, platform_admin):
+    resp = client.post(
+        BOOTSTRAP,
+        json=_bootstrap_body(officerPassword=STRONG_PASSWORD),
+        headers={**platform_admin, **BOOTSTRAP_HEADERS},
+    )
     assert resp.status_code == 422
 
 
-def test_bootstrap_rejects_duplicate_email(client, officer):
-    resp = client.post(BOOTSTRAP, json=_bootstrap_body(institutionName="Other"), headers=BOOTSTRAP_HEADERS)
+def test_bootstrap_rejects_duplicate_email(client, officer, platform_admin):
+    resp = client.post(
+        BOOTSTRAP,
+        json=_bootstrap_body(institutionName="Other"),
+        headers={**platform_admin, **BOOTSTRAP_HEADERS},
+    )
     assert resp.status_code == 409
 
 
