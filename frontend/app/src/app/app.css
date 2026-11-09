@@ -61,7 +61,8 @@ pre {
   gap: 10px;
   max-width: 900px;
   margin: 0 auto;
-  padding: 16px 24px 0;
+  padding: 16px 24px 12px;
+  border-bottom: 2px solid var(--brand-amber);
   font-family: var(--brand-font);
   font-size: 1.5rem;
   color: var(--brand-navy);

@@ -31,6 +31,14 @@ describe('LoginPageComponent', () => {
     return fixture;
   }
 
+  it('styles buttons and headings from the brand palette (global styles.css)', () => {
+    const root = setup(undefined).nativeElement as HTMLElement;
+    const button = getComputedStyle(root.querySelector('button[type=submit]')!);
+    expect(button.backgroundColor).toBe('rgb(58, 95, 176)'); // --brand-blue #3A5FB0
+    expect(button.color).toBe('rgb(255, 255, 255)');
+    expect(getComputedStyle(root.querySelector('h1')!).color).toBe('rgb(20, 33, 61)'); // --brand-navy #14213D
+  });
+
   it('starts the bootstrap form empty and explains the setup token', () => {
     const fixture = setup(undefined);
     const c = fixture.componentInstance;

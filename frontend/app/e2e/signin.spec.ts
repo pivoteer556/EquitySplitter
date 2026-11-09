@@ -14,6 +14,10 @@ test.beforeEach(async ({ page }) => {
 
 const loginButton = (page: import('@playwright/test').Page) => page.getByRole('button', { name: 'Login' });
 
+test('sign-in button uses the brand blue', async ({ page }) => {
+  await expect(loginButton(page)).toHaveCSS('background-color', 'rgb(58, 95, 176)');
+});
+
 test.describe('client-side validation cannot be skipped by typing nothing useful', () => {
   test('empty submit sends no request and shows no session', async ({ page }) => {
     const calls = countLoginCalls(page);

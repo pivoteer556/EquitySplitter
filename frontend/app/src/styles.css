@@ -5,5 +5,46 @@
   --brand-navy: #14213D;
   --brand-blue: #3A5FB0;
   --brand-amber: #E0A800;
+  /* Contrast (WCAG relative luminance): white on --brand-blue 6.1:1, white on --brand-blue-dark 9.0:1,
+     --brand-navy on --brand-tint 14.9:1, --brand-blue link on --brand-tint 5.7:1. All pass AA (4.5:1),
+     so no extra darkening of the blue was needed beyond the hover shade. */
+  --brand-blue-dark: #2A4688;
+  --brand-tint: #F4F7FC;
   --brand-font: "Bricolage Grotesque", sans-serif;
+}
+
+body {
+  background: var(--brand-tint);
+}
+
+h1,
+h2 {
+  color: var(--brand-navy);
+}
+
+a {
+  color: var(--brand-blue);
+}
+
+button {
+  background: var(--brand-blue);
+  color: #fff;
+  border: 1px solid var(--brand-blue);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--brand-blue-dark);
+  border-color: var(--brand-blue-dark);
+}
+
+button:focus-visible {
+  outline: 3px solid var(--brand-amber);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
