@@ -6,7 +6,7 @@
 
   @if (!signedIn) {
     <p id="signin-needed">
-      Creating an institution requires a signed-in platform admin. <a routerLink="/buyer">Sign in as platform admin</a>, then come back to this page.
+      Creating an institution requires a signed-in platform admin. <a routerLink="/login">Sign in as platform admin</a>, then come back to this page.
     </p>
   } @else {
   <section>
@@ -32,6 +32,6 @@
 
   @if (error) {
     <pre class="error" role="alert">{{ error }}</pre>
-    <p><a routerLink="/buyer">Sign in as platform admin</a></p>
+    <p><a routerLink="/login">Sign in as platform admin</a></p>
   }
 </div>

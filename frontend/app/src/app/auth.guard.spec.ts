@@ -60,10 +60,10 @@ describe('officerGuard', () => {
 });
 
 describe('route guards', () => {
-  it('protects /workbench with officerGuard and /listings with authGuard; /buyer is open', () => {
+  it('protects /workbench with officerGuard and /listings with authGuard; /login is open', () => {
     const by = (p: string) => routes.find((r) => r.path === p)!;
     expect(by('workbench').canActivate).toEqual([officerGuard]);
     expect(by('listings').canActivate).toEqual([authGuard]);
-    expect(by('buyer').canActivate).toBeUndefined();
+    expect(by('login').canActivate).toBeUndefined();
   });
 });

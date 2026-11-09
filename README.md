@@ -51,8 +51,8 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   `/auth/register` ignores `isPlatformAdmin`. The Terraform setup token (`terraform output -raw bootstrap_token`) is
   still required in addition to the admin. Known limits: ordinary accounts cannot be promoted; a platform admin who is
   locked out has no recovery until the password-reset flow exists (BACKLOG 2l); the script does not validate email
-  format; migration 0011 has no test with pre-existing rows. Until the unified login (BACKLOG 2n step 3) the admin signs
-  in on the user sign-in at `/buyer`, then opens `/bootstrap` by URL.
+  format; migration 0011 has no test with pre-existing rows. Since 2026-11-09 (`/buyer` removed) the admin signs in on the
+  one `/login` screen, then opens `/bootstrap` by URL (tokens carry no platform-admin flag yet; planned).
 - **Creating the first platform admin (operator)** — nobody can sign in to create the first admin, so an operator runs
   `python -m scripts.create_platform_admin <email>` with `DATABASE_URL` pointing at the target database (apply
   migrations first, `alembic upgrade head`). The script takes no password and prints a one-time

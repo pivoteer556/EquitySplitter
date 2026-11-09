@@ -76,7 +76,7 @@ describe('BootstrapPageComponent', () => {
       expect(root.querySelector('#bootstrap-form')).toBeNull();
       expect(root.querySelector('input[name="setupToken"]')).toBeNull();
       expect(root.querySelector('#signin-needed')?.textContent).toContain('Sign in as platform admin');
-      expect(root.querySelector('#signin-needed a')?.getAttribute('href')).toBe('/buyer');
+      expect(root.querySelector('#signin-needed a')?.getAttribute('href')).toBe('/login');
       fixture.componentInstance.bootstrapInstitution();
       expect(calls.length).toBe(0);
     });
@@ -92,7 +92,7 @@ describe('BootstrapPageComponent', () => {
     const fixture = setup({ status: 404, error: { detail: 'Not found' } });
     fixture.componentInstance.bootstrapInstitution();
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.error + p a')?.getAttribute('href')).toBe('/buyer');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.error + p a')?.getAttribute('href')).toBe('/login');
   });
 
   describe('bootstrap form', () => {

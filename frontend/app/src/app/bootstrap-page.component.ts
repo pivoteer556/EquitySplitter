@@ -21,7 +21,7 @@ export class BootstrapPageComponent {
 
   error = '';
   loading = false;
-  // Platform admins sign in with the user sign-in (/buyer) until the unified login (BACKLOG 2n step 3).
+  // Platform admins sign in on the unified /login (BACKLOG 2n).
   signedIn = false;
 
   constructor(private readonly api: ApiService) {

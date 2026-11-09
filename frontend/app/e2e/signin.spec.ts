@@ -9,7 +9,7 @@ type Win = { __pwned?: number; __leaks?: string[] };
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/login');
-  await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign In', exact: true })).toBeVisible();
 });
 
 const loginButton = (page: import('@playwright/test').Page) => page.getByRole('button', { name: 'Login' });
@@ -64,9 +64,9 @@ test.describe('client-side validation cannot be skipped by typing nothing useful
     // Client validation is advisory. Disable it and send an email the real server rejects (422, list detail).
     await page.locator('#signin-form').evaluate((f: HTMLFormElement) => (f.noValidate = true));
     await fill(page, 'no-at-sign', 'whatever');
-    const resp = page.waitForResponse(LOGIN_API);
+    const resp = page.waitForResponse('**/api/v1/auth/login');
     await loginButton(page).click();
-    expect((await resp).status()).toBe(422);
+    expect((await resp).status()).toBe(422); // the user login runs first and a 422 is not retried against the institution login
     await expect(alertBox(page)).toHaveText('Something went wrong. Please try again.');
     await expect(alertBox(page)).not.toContainText('loc');
     await expectNoSession(page);
@@ -397,10 +397,16 @@ test.describe('session and routing', () => {
   });
 });
 
-test('brand header shows on /login and on another route (/buyer)', async ({ page }) => {
+test('/buyer is gone: it lands on the login page', async ({ page }) => {
+  await page.goto('/buyer');
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: 'Sign In', exact: true })).toBeVisible();
+});
+
+test('brand header shows on /login and on another route (/accept-invite)', async ({ page }) => {
   const header = page.locator('header.brand');
   await expect(header).toBeVisible();
   await expect(header.getByRole('img', { name: 'EquitySplitter' })).toBeVisible();
-  await page.goto('/buyer');
+  await page.goto('/accept-invite');
   await expect(header).toBeVisible();
 });

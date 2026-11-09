@@ -1,8 +1,8 @@
 <div class="login-shell">
   <header class="hero">
     <p class="eyebrow">Shared Mortgage Platform</p>
-    <h1>Institution Access</h1>
-    <p>Sign in to your lending institution.</p>
+    <h1>Sign in</h1>
+    <p>Owners, buyers and lending institutions sign in here.</p>
   </header>
 
   <section>
@@ -16,13 +16,28 @@
     </form>
   </section>
 
-  <p><a routerLink="/buyer">Looking to buy? Sign in as a buyer</a></p>
+  <details>
+    <summary>New here? Create an account</summary>
+    <form aria-label="Create account" ngNativeValidate (submit)="$event.preventDefault(); register(rn.value, re.value, rp.value)">
+      <label for="register-name">Name</label>
+      <input #rn id="register-name" name="name" type="text" autocomplete="name" required />
+      <label for="register-email">Email</label>
+      <input #re id="register-email" name="email" type="email" autocomplete="email" required />
+      <label for="register-password">Password</label>
+      <input #rp id="register-password" name="password" type="password" autocomplete="new-password" required
+        minlength="10" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}"
+        title="At least 10 characters with a lowercase letter, an uppercase letter, a digit and a symbol."
+        passwordrules="minlength: 10; required: lower; required: upper; required: digit; required: special;"
+        aria-describedby="register-hint" />
+      <p id="register-hint">At least 10 characters, with a lowercase letter, an uppercase letter, a digit and a symbol.</p>
+      <button type="submit" [disabled]="registerLoading">{{ registerLoading ? 'Creating...' : 'Create account' }}</button>
+      @if (registerError) {
+        <p class="error" role="alert">{{ registerError }}</p>
+      }
+    </form>
+  </details>
 
   @if (error) {
     <pre class="error" role="alert">{{ error }}</pre>
-  }
-
-  @if (lastResponse) {
-    <pre>{{ lastResponse }}</pre>
   }
 </div>
