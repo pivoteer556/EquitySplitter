@@ -39,10 +39,11 @@ def test_success_resets_counter(client, officer):
         assert _login(client, url, "wrong-password").status_code == 401
 
 
-def test_counters_are_independent_per_email_and_endpoint(client, officer):
+def test_counters_are_independent_per_email_and_shared_across_endpoints(client, officer):
     _fail_until_blocked(client, "/api/v1/auth/institution/login")
     assert _login(client, "/api/v1/auth/institution/login", "x", "other@example.com").status_code != 429
-    assert _login(client, "/api/v1/auth/login", "x").status_code != 429
+    assert _login(client, "/api/v1/auth/login", "x").status_code == 429  # same ip+email, same budget
+    assert _login(client, "/api/v1/auth/login", "x", "other@example.com").status_code != 429
 
 
 URL = "/api/v1/auth/institution/login"

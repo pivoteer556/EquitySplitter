@@ -7,14 +7,45 @@ import { environment as productionEnvironment } from '../environments/environmen
 import { ApiService } from './api.service';
 
 describe('ApiService base URL', () => {
-  it('posts institution login under the configured apiBaseUrl', () => {
+  function loginSetup() {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     const api = TestBed.inject(ApiService);
     const http = TestBed.inject(HttpTestingController);
+    api.clearTokens();
+    api.setInstitutionId('');
+    return { api, http };
+  }
 
-    api.institutionLogin('a@b.c', 'x').subscribe();
+  it('login posts once to /auth/login under the configured apiBaseUrl and stores a user token', () => {
+    const { api, http } = loginSetup();
+    let result: unknown;
 
-    http.expectOne(`${environment.apiBaseUrl}/auth/institution/login`).flush({ accessToken: 'not-a-jwt' });
+    api.login('a@b.c', 'x').subscribe((r) => (result = r));
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/auth/login`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ email: 'a@b.c', password: 'x' });
+    req.flush({ accessToken: 'user-jwt', tokenType: 'Bearer', userType: 'user', isPlatformAdmin: true, role: null, institutionId: null });
+    expect(api.getUserToken()).toBe('user-jwt');
+    expect(api.getInstitutionToken()).toBe('');
+    expect((result as { isPlatformAdmin: boolean }).isPlatformAdmin).toBeTrue();
+    api.clearTokens();
+    http.verify();
+  });
+
+  it('login stores an institution_user as the officer token and institution id, not the user token', () => {
+    const { api, http } = loginSetup();
+
+    api.login('o@b.c', 'x').subscribe();
+
+    http.expectOne(`${environment.apiBaseUrl}/auth/login`).flush({
+      accessToken: 'officer-jwt', tokenType: 'Bearer', userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'inst-9',
+    });
+    expect(api.getInstitutionToken()).toBe('officer-jwt');
+    expect(api.getInstitutionId()).toBe('inst-9');
+    expect(api.getUserToken()).toBe('');
+    api.clearTokens();
+    api.setInstitutionId('');
     http.verify();
   });
 

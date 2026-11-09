@@ -1,23 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { ApiService } from './api.service';
 import { LoginPageComponent } from './login-page.component';
 import { expectPasswordRule } from './password-rule.testing';
 
 describe('LoginPageComponent', () => {
-  // `err` is the institution outcome (undefined = success); `userErr` (null = success, default 401: no such user account) is the owner/buyer/admin outcome.
-  // `calls` records institution attempts, `userCalls` records user attempts.
-  function setup(err: unknown, calls: string[][] = [], userErr: unknown = { status: 401 }, userCalls: string[][] = [], registerCalls: unknown[] = [], registerErr: unknown = null) {
+  // `err` is the login outcome (undefined = success returning `result`); `calls` records login attempts.
+  const USER = { userType: 'user', isPlatformAdmin: false, role: null, institutionId: null };
+  function setup(err: unknown, calls: string[][] = [], result: unknown = USER, registerCalls: unknown[] = [], registerErr: unknown = null) {
     const api = {
-      ownerLogin: (email: string, password: string) => {
-        userCalls.push([email, password]);
-        return userErr === null ? of({}) : throwError(() => userErr);
-      },
-      institutionLogin: (email: string, password: string) => {
+      login: (email: string, password: string) => {
         calls.push([email, password]);
-        return err === undefined ? of({}) : throwError(() => err);
+        return err === undefined ? of(result) : throwError(() => err);
       },
       ownerRegister: (payload: unknown) => {
         registerCalls.push(payload);
@@ -134,58 +130,81 @@ describe('LoginPageComponent', () => {
     expect(root.querySelector('a[href="/bootstrap"]')).toBeNull();
   });
 
-  // One form signs in every kind of account: owner/buyer/admin (user login) or officer (institution login).
+  // One form, one request: the server says what kind of account signed in.
   describe('unified sign-in routing', () => {
-    function go(instErr: unknown, userErr: unknown) {
+    function go(err: unknown, result: unknown = USER) {
       const calls: string[][] = [];
-      const userCalls: string[][] = [];
-      const fixture = setup(instErr, calls, userErr, userCalls);
+      const fixture = setup(err, calls, result);
       const nav = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
       const c = fixture.componentInstance;
       c.loginEmail = 'a@b.com';
       c.loginPassword = 'pw';
       c.login();
       fixture.detectChanges();
-      return { fixture, nav, calls, userCalls };
+      return { fixture, nav, calls };
     }
 
-    it('signs an owner in via the user login and goes to /listings without trying the institution', () => {
-      const { nav, calls, userCalls } = go({ status: 401 }, null);
-      expect(userCalls).toEqual([['a@b.com', 'pw']]);
-      expect(calls).toEqual([]);
+    it('sends an owner to /listings with a single login call', () => {
+      const { nav, calls } = go(undefined);
+      expect(calls).toEqual([['a@b.com', 'pw']]);
       expect(nav).toHaveBeenCalledWith('/listings');
     });
 
-    it('falls back to the institution login on a user 401 and goes to /workbench', () => {
-      const { nav, calls } = go(undefined, { status: 401 });
-      expect(calls).toEqual([['a@b.com', 'pw']]);
+    it('sends an officer (institution_user) to /workbench', () => {
+      const { nav } = go(undefined, { userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'i1' });
       expect(nav).toHaveBeenCalledWith('/workbench');
     });
 
-    it('shows one plain message when both logins return 401', () => {
-      const { fixture, nav } = go({ status: 401 }, { status: 401 });
+    it('sends a platform admin to /bootstrap', () => {
+      const { nav } = go(undefined, { userType: 'user', isPlatformAdmin: true, role: null, institutionId: null });
+      expect(nav).toHaveBeenCalledWith('/bootstrap');
+    });
+
+    it('shows one plain message on 401 and makes only one call', () => {
+      const { fixture, nav, calls } = go({ status: 401 });
+      expect(calls.length).toBe(1);
       expect((fixture.nativeElement as HTMLElement).querySelector('.error')?.textContent?.trim()).toBe('Incorrect email or password.');
       expect(nav).not.toHaveBeenCalled();
     });
 
-    it('still tries the institution when the user login is rate limited (separate buckets), and reports the 429 if that fails', () => {
-      const { fixture, nav, calls } = go({ status: 401 }, { status: 429, headers: { get: () => '30' } });
-      expect(calls.length).toBe(1);
+    it('reports a 429 as the rate-limit message, not as a wrong password', () => {
+      const { fixture, nav } = go({ status: 429, headers: { get: () => '30' } });
+      const text = (fixture.nativeElement as HTMLElement).querySelector('.error')?.textContent ?? '';
+      expect(text).toBeTruthy();
+      expect(text).not.toContain('Incorrect email or password.');
       expect(nav).not.toHaveBeenCalled();
-      expect((fixture.nativeElement as HTMLElement).querySelector('.error')?.textContent).not.toContain('Incorrect email or password.');
     });
 
-    it('does not try the institution after a server or network error on the user login', () => {
-      const { fixture, calls } = go({ status: 401 }, { status: 500 });
-      expect(calls).toEqual([]);
+    it('shows an error after a server error', () => {
+      const { fixture } = go({ status: 500 });
       expect((fixture.nativeElement as HTMLElement).querySelector('.error')).toBeTruthy();
+    });
+
+    it('sends the submitted credentials even if the fields are edited while the request is pending', () => {
+      const calls: string[][] = [];
+      const pending = new Subject<unknown>();
+      const fixture = setup(undefined, calls);
+      (TestBed.inject(ApiService) as unknown as { login: unknown }).login = (e: string, p: string) => {
+        calls.push([e, p]);
+        return pending;
+      };
+      const nav = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+      const c = fixture.componentInstance;
+      c.loginEmail = 'a@b.com';
+      c.loginPassword = 'pw';
+      c.login();
+      c.loginEmail = 'edited@b.com';
+      c.loginPassword = 'edited';
+      pending.next({ ...USER, userType: 'institution_user' });
+      expect(calls).toEqual([['a@b.com', 'pw']]);
+      expect(nav).toHaveBeenCalledWith('/workbench');
     });
   });
 
   describe('create account (owner sign-up, same as the old /buyer form)', () => {
     it('submits name, email and password to ownerRegister and goes to /listings', async () => {
       const registerCalls: unknown[] = [];
-      const fixture = setup(undefined, [], { status: 401 }, [], registerCalls);
+      const fixture = setup(undefined, [], USER, registerCalls);
       const nav = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
       const root = fixture.nativeElement as HTMLElement;
       const f = root.querySelector('form[aria-label="Create account"]') as HTMLFormElement;
@@ -201,7 +220,7 @@ describe('LoginPageComponent', () => {
 
     // Ported from the removed buyer-page spec.
     function createForm(registerErr: unknown = null, registerCalls: unknown[] = []) {
-      const fixture = setup(undefined, [], { status: 401 }, [], registerCalls, registerErr);
+      const fixture = setup(undefined, [], USER, registerCalls, registerErr);
       spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
       const f = (fixture.nativeElement as HTMLElement).querySelector('form[aria-label="Create account"]') as HTMLFormElement;
       const fill = (name: string, v: string) => ((f.querySelector(`input[name="${name}"]`) as HTMLInputElement).value = v);

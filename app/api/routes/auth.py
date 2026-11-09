@@ -18,6 +18,7 @@ from app.schemas.auth import (
     InstitutionBootstrapRequest,
     InstitutionBootstrapResponse,
     InstitutionRevokeRequest,
+    LoginResponse,
 )
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
 from app.services.auth import (
@@ -134,19 +135,42 @@ def register(payload: AuthRegisterRequest, request: Request, db: Session = Depen
     return AuthTokenResponse(accessToken=token)
 
 
-@router.post("/login", response_model=AuthTokenResponse)
+def _authenticate(db: Session, email: str, password: str) -> User | InstitutionUser | None:
+    """Try the user account first, then the officer account. Every miss spends one argon2 verification (a real one or
+    a dummy), so a failure costs two whatever exists and does not reveal which kind of account an email is."""
+    candidates: tuple[User | InstitutionUser | None, ...] = (
+        db.query(User).filter(User.email == email).first(),
+        db.query(InstitutionUser).filter(InstitutionUser.email == email).first(),
+    )
+    for account in candidates:
+        if account is None or account.passwordHash is None:
+            burn_password_check(password)
+        elif verify_and_upgrade_password(db, account, password):
+            return account
+    return None
+
+
+@router.post("/login", response_model=LoginResponse)
 def login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
-    key = _login_key("user", request, payload.email)
+    key = _login_key("login", request, payload.email)  # one budget per ip+email, whichever kind of account it is
     _enforce_login_limit(db, key)
-    user = db.query(User).filter(User.email == payload.email).first()
-    if user is None or user.passwordHash is None:
-        burn_password_check(payload.password)
-        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
-    if not verify_and_upgrade_password(db, user, payload.password):
-        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    account = _authenticate(db, payload.email, payload.password)
+    if account is None:
+        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")  # one failure counts once
     login_limiter.reset(db, key)
-    token = refresh_and_store_user_token(db, user)
-    return AuthTokenResponse(accessToken=token)
+    if isinstance(account, InstitutionUser):
+        return LoginResponse(
+            accessToken=refresh_and_store_institution_token(db, account),
+            userType="institution_user",
+            isPlatformAdmin=False,
+            role=account.role,
+            institutionId=account.institutionId,
+        )
+    return LoginResponse(
+        accessToken=refresh_and_store_user_token(db, account),
+        userType="user",
+        isPlatformAdmin=account.isPlatformAdmin,
+    )
 
 
 @router.post("/accept-invite", response_model=AuthTokenResponse)
@@ -165,7 +189,7 @@ def institution_activate(payload: AcceptInviteRequest, request: Request, db: Ses
 
 @router.post("/institution/login", response_model=AuthTokenResponse)
 def institution_login(payload: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
-    key = _login_key("institution", request, payload.email)
+    key = _login_key("login", request, payload.email)  # shared with /login so the two cannot double the budget
     _enforce_login_limit(db, key)
     inst_user = db.query(InstitutionUser).filter(InstitutionUser.email == payload.email).first()
     if inst_user is None or inst_user.passwordHash is None:

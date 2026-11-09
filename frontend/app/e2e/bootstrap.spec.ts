@@ -13,14 +13,14 @@ const BOOTSTRAP_API = '**/api/v1/auth/institution/bootstrap';
 
 test.describe.configure({ mode: 'serial' });
 
-/** Real UI sign-in on /login (the user login runs first), then open /bootstrap by URL and fill the officer fields. */
-async function signInAndOpen(page: Page, email: string, password: string) {
+/** Real UI sign-in on /login (admin lands on /bootstrap, others on `landing`), then open /bootstrap by URL and fill the officer fields. */
+async function signInAndOpen(page: Page, email: string, password: string, landing: RegExp = /\/bootstrap$/) {
   await page.goto('/login');
   await page.locator('#login-email').fill(email);
   await page.locator('#login-password').fill(password);
   await page.getByRole('button', { name: 'Login', exact: true }).click();
-  await expect(page).toHaveURL(/\/listings/);
-  await page.goto('/bootstrap');
+  await expect(page).toHaveURL(landing);
+  await page.goto('/bootstrap'); // a reload for the admin; the only way in for a non-admin
   await fillOfficer(page);
 }
 
@@ -139,7 +139,7 @@ test('an officer (institution) session is not a platform admin: no form on /boot
 
 test('a signed-in ordinary user with the RIGHT token is rejected with the same message and no institution', async ({ page }) => {
   const u = await makeOrdinaryUser(); // registration ignores any isPlatformAdmin it is sent
-  await signInAndOpen(page, u.email, u.password);
+  await signInAndOpen(page, u.email, u.password, /\/listings$/);
   const resp = page.waitForResponse(BOOTSTRAP_API);
   await tokenInput(page).fill(BOOTSTRAP_TOKEN);
   await submit(page).click();

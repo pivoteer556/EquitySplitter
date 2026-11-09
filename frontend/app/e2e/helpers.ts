@@ -1,7 +1,7 @@
 import { expect, Page, Request } from '@playwright/test';
 import { activate, ADMIN_EMAIL, ADMIN_PASSWORD, API } from './global-setup';
 
-export const LOGIN_API = '**/api/v1/auth/institution/login';
+export const LOGIN_API = '**/api/v1/auth/login';
 export const GOOD_PASSWORD = 'Str0ng!Passw0rd#1';
 
 export interface TestUser {
@@ -25,7 +25,7 @@ export async function makeUser(tag: string): Promise<TestUser> {
 }
 
 async function createUser(tag: string): Promise<TestUser> {
-  const login = await fetch(`${API}/auth/institution/login`, {
+  const login = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
@@ -52,7 +52,7 @@ async function createUser(tag: string): Promise<TestUser> {
 export async function makePendingOfficer(tag: string): Promise<{ email: string; token: string }> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const login = await fetch(`${API}/auth/institution/login`, {
+      const login = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
@@ -78,7 +78,7 @@ export async function makePendingOfficer(tag: string): Promise<{ email: string; 
 export function countLoginCalls(page: Page): { count: () => number } {
   let n = 0;
   page.on('request', (r: Request) => {
-    if (r.method() === 'POST' && r.url().endsWith('/auth/institution/login')) n++;
+    if (r.method() === 'POST' && r.url().endsWith('/auth/login')) n++;
   });
   return { count: () => n };
 }

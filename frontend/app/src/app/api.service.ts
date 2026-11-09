@@ -11,6 +11,7 @@ import {
   InstitutionBootstrapResponse,
   InstitutionUserCreated,
   Listing,
+  LoginResponse,
   Property,
   PropertyAgreement,
   PropertyDetailResponse,
@@ -55,23 +56,22 @@ export class ApiService {
     );
   }
 
-  institutionLogin(email: string, password: string): Observable<AuthTokenResponse> {
-    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/institution/login`, { email, password }).pipe(
+  /** One sign-in for every account; userType in the response decides which stored token (officer or user) it becomes. */
+  login(email: string, password: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login`, { email, password }).pipe(
       tap((res) => {
-        this.setInstitutionToken(res.accessToken);
-        this.setInstitutionId(this.extractInstitutionId(res.accessToken));
+        if (res.userType === 'institution_user') {
+          this.setInstitutionToken(res.accessToken);
+          this.setInstitutionId(res.institutionId ?? '');
+        } else {
+          this.setUserToken(res.accessToken);
+        }
       }),
     );
   }
 
   ownerRegister(payload: { name: string; email: string; password: string }): Observable<AuthTokenResponse> {
     return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/register`, payload).pipe(
-      tap((res) => this.setUserToken(res.accessToken)),
-    );
-  }
-
-  ownerLogin(email: string, password: string): Observable<AuthTokenResponse> {
-    return this.http.post<AuthTokenResponse>(`${this.baseUrl}/auth/login`, { email, password }).pipe(
       tap((res) => this.setUserToken(res.accessToken)),
     );
   }

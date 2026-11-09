@@ -1,4 +1,6 @@
 import re
+from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
@@ -37,6 +39,16 @@ class AuthLoginRequest(BaseModel):
 class AuthTokenResponse(BaseModel):
     accessToken: str
     tokenType: str = "Bearer"
+
+
+class LoginResponse(AuthTokenResponse):
+    """Token plus access info, so a client can route from one login response. userType is "user" (owner, buyer or
+    platform admin) or "institution_user" (officer); role and institutionId are set for officers only."""
+
+    userType: Literal["user", "institution_user"]
+    isPlatformAdmin: bool
+    role: str | None = None
+    institutionId: UUID | None = None
 
 
 class AcceptInviteRequest(BaseModel):

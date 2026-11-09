@@ -161,7 +161,7 @@ Notes:
 - `POST /api/v1/auth/institution/bootstrap`
 - `POST /api/v1/auth/institution/login`
 - `POST /api/v1/auth/register`
-- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/login` (signs in any account, user or officer; returns `accessToken` plus `userType`, `isPlatformAdmin`, `role`, `institutionId`)
 - `POST /api/v1/institutions`
 - `POST /api/v1/institution-users`
 - `POST /api/v1/properties`

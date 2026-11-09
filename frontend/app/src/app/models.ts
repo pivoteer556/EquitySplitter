@@ -65,6 +65,14 @@ export interface AuthTokenResponse {
   tokenType: string;
 }
 
+/** Response of POST /auth/login: the token plus what kind of account signed in. */
+export interface LoginResponse extends AuthTokenResponse {
+  userType: 'user' | 'institution_user';
+  isPlatformAdmin: boolean;
+  role: string | null;
+  institutionId: string | null;
+}
+
 export interface InstitutionBootstrapResponse {
   institution: Institution;
   institutionUser: InstitutionUser;

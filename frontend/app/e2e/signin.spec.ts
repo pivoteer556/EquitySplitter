@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PLATFORM_ADMIN_EMAIL, PLATFORM_ADMIN_PASSWORD } from './global-setup';
 import { alertBox, countLoginCalls, expectNoSession, fill, LOGIN_API, makeUser } from './helpers';
 
 // Adversarial suite for Sign In, run against the REAL backend (throwaway database `equity_e2e`).
@@ -24,6 +25,40 @@ test('sign-in card is a cream surface distinct from the light blue page backgrou
   const body = await page.locator('body').evaluate((e) => getComputedStyle(e).backgroundColor);
   expect(body).toBe('rgb(159, 196, 238)');
   expect(body).not.toBe('rgb(248, 237, 203)');
+});
+
+test('countLoginCalls is not vacuous: it counts exactly 1 when a login really is sent', async ({ page }) => {
+  const calls = countLoginCalls(page);
+  await fill(page, `ghost-${Date.now()}@e2e.example.com`, 'Wrong!Passw0rd#9');
+  const resp = page.waitForResponse(LOGIN_API);
+  await loginButton(page).click();
+  await resp;
+  expect(calls.count()).toBe(1);
+});
+
+test('a failed sign-in is exactly one request to /auth/login, and the old per-kind endpoints are never called', async ({ page }) => {
+  const urls: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().includes('/auth/')) urls.push(new URL(r.url()).pathname);
+  });
+  await fill(page, `ghost-${Date.now()}@e2e.example.com`, 'Wrong!Passw0rd#9');
+  const resp = page.waitForResponse(LOGIN_API);
+  await loginButton(page).click();
+  expect((await resp).status()).toBe(401);
+  await expect(alertBox(page)).toBeVisible();
+  expect(urls).toEqual(['/api/v1/auth/login']);
+});
+
+test('a platform admin signing in on /login lands on /bootstrap with a single /auth/login request', async ({ page }) => {
+  const urls: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().includes('/auth/')) urls.push(new URL(r.url()).pathname);
+  });
+  await fill(page, PLATFORM_ADMIN_EMAIL, PLATFORM_ADMIN_PASSWORD);
+  await loginButton(page).click();
+  await expect(page).toHaveURL(/\/bootstrap$/);
+  expect(urls).toEqual(['/api/v1/auth/login']);
+  expect(urls.some((u) => u.includes('/auth/institution/login'))).toBe(false);
 });
 
 test.describe('client-side validation cannot be skipped by typing nothing useful', () => {
@@ -66,7 +101,7 @@ test.describe('client-side validation cannot be skipped by typing nothing useful
     await fill(page, 'no-at-sign', 'whatever');
     const resp = page.waitForResponse('**/api/v1/auth/login');
     await loginButton(page).click();
-    expect((await resp).status()).toBe(422); // the user login runs first and a 422 is not retried against the institution login
+    expect((await resp).status()).toBe(422); // a single unified login call; nothing is retried
     await expect(alertBox(page)).toHaveText('Something went wrong. Please try again.');
     await expect(alertBox(page)).not.toContainText('loc');
     await expectNoSession(page);

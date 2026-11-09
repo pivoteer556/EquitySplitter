@@ -28,32 +28,16 @@ export class LoginPageComponent {
   registerLoading = false;
 
   /**
-   * One form for every account (BACKLOG 2n). Try the user login (owner/buyer/platform admin) first, then the
-   * institution login (officer). If an email exists as both kinds the user account wins; choosing between them is a
-   * separate, later item. Rate limits hold: the server keys each kind separately ("user:" / "institution:" +
-   * ip + email), so every wrong guess is counted in both buckets and nothing gets more attempts than before. A user-side
-   * 429 therefore does not stop the institution attempt (an officer must not be locked out by their own bucket
-   * of failed user probes); if that also fails, the 429 is what we report.
-   * Routing: the token carries no platform-admin flag, so admins land on /listings like any user and open /bootstrap
-   * themselves (its server gate is unchanged).
+   * One form, one request (BACKLOG 2n): POST /auth/login signs in any account and says which kind it was.
+   * Officer -> /workbench, platform admin -> /bootstrap, any other user -> /listings.
    */
   login(): void {
     this.error = '';
     this.loading = true;
     const { loginEmail: email, loginPassword: password } = this; // the SUBMITTED credentials, even if the fields are edited while pending
-    this.api.ownerLogin(email, password).subscribe({
-      next: () => this.router.navigateByUrl('/listings'),
-      error: (userErr) => {
-        const status = (userErr as { status?: number })?.status;
-        if (status !== 401 && status !== 429) {
-          this.fail(userErr);
-          return;
-        }
-        this.api.institutionLogin(email, password).subscribe({
-          next: () => this.router.navigateByUrl('/workbench'),
-          error: (instErr) => this.fail(status === 429 ? userErr : instErr),
-        });
-      },
+    this.api.login(email, password).subscribe({
+      next: (res) => this.router.navigateByUrl(res.userType === 'institution_user' ? '/workbench' : res.isPlatformAdmin ? '/bootstrap' : '/listings'),
+      error: (err) => this.fail(err),
     });
   }
 
