@@ -27,3 +27,10 @@ def test_offline_render_creates_property_listings_with_one_listed_per_property(c
     sql = capsys.readouterr().out
     assert 'CREATE TABLE "propertyListings"' in sql
     assert "CREATE UNIQUE INDEX" in sql and "WHERE status = 'listed'" in sql
+
+
+def test_offline_render_creates_totp_credentials_one_per_user(capsys):
+    command.upgrade(Config("alembic.ini"), "0009_property_listings:0010_totp_credentials", sql=True)
+    sql = capsys.readouterr().out
+    assert 'CREATE TABLE "totpCredentials"' in sql
+    assert "UNIQUE (" in sql and '"institutionUserId"' in sql and "ON DELETE CASCADE" in sql

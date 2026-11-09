@@ -13,6 +13,7 @@ from app.models.property_agreement import PropertyAgreement
 from app.models.property_listing import PropertyListing
 from app.models.rate_limit_hit import RateLimitHit
 from app.models.token_revocation import TokenRevocation
+from app.models.totp_credential import TotpCredential
 from app.models.transfer_claim import TransferClaim
 from app.models.user import User
 from app.models.user_property import UserProperty
@@ -34,6 +35,7 @@ __all__ = [
     "EquityTransfer",
     "TransferClaim",
     "TokenRevocation",
+    "TotpCredential",
     "AuthSecretState",
     "RateLimitHit",
 ]
