@@ -384,3 +384,12 @@ test.describe('session and routing', () => {
     await expect(page).toHaveURL(/\/workbench$/);
   });
 });
+
+test('brand header shows on /login and on another route (/buyer)', async ({ page }) => {
+  const header = page.locator('header.brand');
+  await expect(header).toBeVisible();
+  await expect(header.getByRole('img', { name: /EquitySplitter logo mark/ })).toBeVisible();
+  await expect(header).toContainText('EquitySplitter');
+  await page.goto('/buyer');
+  await expect(header).toBeVisible();
+});

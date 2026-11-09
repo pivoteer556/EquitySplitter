@@ -1,1 +1,9 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Brand palette (docs/design/README.md). Light backgrounds only; no dark-mode variant yet. */
+:root {
+  --brand-navy: #14213D;
+  --brand-blue: #3A5FB0;
+  --brand-amber: #E0A800;
+  --brand-font: "Bricolage Grotesque", sans-serif;
+}

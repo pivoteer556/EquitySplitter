@@ -54,3 +54,35 @@ pre {
 .error {
   background: #7f1d1d;
 }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 24px 0;
+  font-family: var(--brand-font);
+  font-size: 1.5rem;
+  color: var(--brand-navy);
+}
+
+.brand-equity {
+  font-weight: 500;
+}
+
+.brand-splitter {
+  font-weight: 800;
+}
+
+.share-navy {
+  fill: var(--brand-navy);
+}
+
+.share-blue {
+  fill: var(--brand-blue);
+}
+
+.share-amber {
+  fill: var(--brand-amber);
+}
