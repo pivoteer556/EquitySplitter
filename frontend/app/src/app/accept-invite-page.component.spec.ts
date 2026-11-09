@@ -24,7 +24,7 @@ describe('AcceptInvitePageComponent', () => {
         { provide: ApiService, useValue: api },
         provideRouter([
           { path: 'accept-invite', component: AcceptInvitePageComponent },
-          { path: 'workbench', children: [] },
+          { path: 'listings', children: [] },
         ]),
       ],
     });
@@ -99,7 +99,7 @@ describe('AcceptInvitePageComponent', () => {
     expect(f!.checkValidity()).toBeTrue();
   });
 
-  it('calls acceptInvite once with the fragment token and navigates to /workbench', async () => {
+  it('calls acceptInvite once with the fragment token and navigates to /listings, which a user token can open', async () => {
     const calls: string[][] = [];
     const { harness, f, fill } = await setup(`/accept-invite#token=${TOKEN}`, undefined, calls);
     fill('password', GOOD);
@@ -107,7 +107,7 @@ describe('AcceptInvitePageComponent', () => {
     f!.requestSubmit();
     await harness.fixture.whenStable();
     expect(calls).toEqual([[TOKEN, GOOD]]);
-    expect(TestBed.inject(Router).url).toBe('/workbench');
+    expect(TestBed.inject(Router).url).toBe('/listings');
   });
 
   it('shows an invite-specific sentence on 401', async () => {

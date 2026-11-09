@@ -32,7 +32,7 @@ export class AcceptInvitePageComponent {
     this.error = '';
     this.loading = true;
     this.api.acceptInvite(this.token, password).subscribe({
-      next: () => this.router.navigateByUrl('/workbench'),
+      next: () => this.router.navigateByUrl('/listings'),
       error: (err) => {
         this.error = friendlyError(err, INVALID_INVITE);
         this.loading = false;

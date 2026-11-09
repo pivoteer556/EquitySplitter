@@ -60,8 +60,9 @@ test('officer invites an owner: no password input, link shown, token not echoed,
   const accepted = owner.waitForResponse('**/api/v1/auth/accept-invite');
   await owner.getByRole('button', { name: 'Set password' }).click();
   expect((await accepted).status()).toBe(200);
-  // The owner is signed in (user token stored). Known gap, deliberately not asserted: the accept-invite page then
-  // navigates to /workbench, which is officer-only, so the owner is bounced to /login (see report).
+  // The owner is signed in (user token stored) and lands on a page they can open, not bounced to /login.
+  await expect(owner).toHaveURL(/\/listings$/);
+  await expect(owner).not.toHaveURL(/\/login/);
   await expect.poll(() => owner.evaluate(() => (localStorage.getItem('userToken') ?? '').length)).toBeGreaterThan(20);
   expect(await owner.evaluate(() => localStorage.getItem('institutionToken'))).toBeNull();
   await ctx.close();
