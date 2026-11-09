@@ -22,7 +22,7 @@ test('sign-in card is a cream surface distinct from the light blue page backgrou
   const card = page.locator('.login-shell');
   await expect(card).toHaveCSS('background-color', 'rgb(248, 237, 203)');
   const body = await page.locator('body').evaluate((e) => getComputedStyle(e).backgroundColor);
-  expect(body).toBe('rgb(169, 193, 238)');
+  expect(body).toBe('rgb(159, 196, 238)');
   expect(body).not.toBe('rgb(248, 237, 203)');
 });
 

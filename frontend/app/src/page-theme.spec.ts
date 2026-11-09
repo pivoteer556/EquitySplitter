@@ -14,7 +14,7 @@ function contrast(a: string, b: string): number {
 describe('page theme (light blue page)', () => {
   it('puts a light blue background on the page with navy text that reads on it', () => {
     const body = getComputedStyle(document.body);
-    expect(body.backgroundColor).toBe('rgb(169, 193, 238)'); // --brand-page #A9C1EE
+    expect(body.backgroundColor).toBe('rgb(159, 196, 238)'); // --brand-page #9FC4EE
     expect(body.color).toBe('rgb(20, 33, 61)'); // --brand-navy
     expect(body.color).not.toBe(body.backgroundColor);
     expect(contrast(body.color, body.backgroundColor)).toBeGreaterThanOrEqual(4.5);
