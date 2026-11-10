@@ -18,6 +18,7 @@ import {
   PropertyAgreement,
   PropertyDetailResponse,
   PropertyOwnersResponse,
+  RecoveryCodesResponse,
   SecondFactorChallenge,
   TotpEnrollment,
 } from './models';
@@ -82,6 +83,13 @@ export class ApiService {
   /** Confirms the first code; the answer is a normal login (stored exactly as login does) plus the one-time recovery codes. */
   enrolConfirm(challengeToken: string, code: string): Observable<EnrolConfirmResponse> {
     return this.http.post<EnrolConfirmResponse>(`${this.baseUrl}/auth/login/totp/enroll-confirm`, { challengeToken, code }).pipe(tap((res) => this.storeLogin(res)));
+  }
+
+  /** Signed-in officer proves the current authenticator code and gets a new set of recovery codes (the old set is replaced). */
+  regenerateRecoveryCodes(code: string): Observable<RecoveryCodesResponse> {
+    return this.http
+      .post<RecoveryCodesResponse>(`${this.baseUrl}/auth/institution/totp/recovery-codes`, { code }, { observe: 'response', headers: this.institutionHeaders() })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
   }
 
   private storeLogin(res: LoginResponse): void {

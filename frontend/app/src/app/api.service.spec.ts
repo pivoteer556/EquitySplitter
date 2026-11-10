@@ -96,6 +96,24 @@ describe('ApiService base URL', () => {
     http.verify();
   });
 
+  it('regenerateRecoveryCodes posts the code with the officer bearer, returns the new codes and keeps the rotated token', () => {
+    const { api, http } = loginSetup();
+    api.setInstitutionToken('officer-jwt');
+    let result: { recoveryCodes: string[] } | undefined;
+
+    api.regenerateRecoveryCodes('123456').subscribe((r) => (result = r));
+
+    const req = http.expectOne(`${environment.apiBaseUrl}/auth/institution/totp/recovery-codes`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ code: '123456' });
+    expect(req.request.headers.get('Authorization')).toBe('Bearer officer-jwt');
+    req.flush({ recoveryCodes: ['AAAAA-BBBBB', 'CCCCC-DDDDD'] }, { headers: { 'X-Refreshed-Token': 'officer-jwt-2' } });
+    expect(result).toEqual({ recoveryCodes: ['AAAAA-BBBBB', 'CCCCC-DDDDD'] });
+    expect(api.getInstitutionToken()).toBe('officer-jwt-2');
+    api.clearTokens();
+    http.verify();
+  });
+
   it('login stores an institution_user as the officer token and institution id, not the user token', () => {
     const { api, http } = loginSetup();
 

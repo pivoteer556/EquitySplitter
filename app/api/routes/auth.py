@@ -26,6 +26,8 @@ from app.schemas.auth import (
     InstitutionRevokeRequest,
     LoginResponse,
     LoginTotpRequest,
+    RecoveryCodesRequest,
+    RecoveryCodesResponse,
     SecondFactorChallenge,
 )
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
@@ -351,3 +353,37 @@ def institution_revoke(
     db.add(revocation)
     db.commit()
     return None
+
+
+@router.post("/institution/totp/recovery-codes", response_model=RecoveryCodesResponse)
+def regenerate_recovery_codes(
+    payload: RecoveryCodesRequest,
+    request: Request,
+    principal: Principal = Depends(require_institution_user),
+    db: Session = Depends(get_db),
+):
+    """Replace the signed-in officer's recovery codes. Needs a current authenticator code (a recovery code does not
+    work here); every failure, including no confirmed authenticator, is the generic 401 and counts toward the shared
+    "login" budget. Old rows are deleted and the new ones inserted in one commit, so a failure leaves the old set."""
+    officer = db.get(InstitutionUser, principal.user_id)
+    assert officer is not None  # require_institution_user just loaded this row
+    key = _login_key("login", request, officer.email)
+    _enforce_login_limit(db, key)
+    credential = _confirmed_credential(db, officer.id)
+    step = None
+    if credential is not None:
+        step = totp.verify_code(
+            totp.decrypt_secret(credential.secretEncrypted),
+            payload.code,
+            auth_service.now_utc_seconds(),
+            credential.lastUsedStep,
+        )
+    if credential is None or step is None:
+        _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+    credential.lastUsedStep = step  # single use, same replay protection as sign-in
+    login_limiter.reset(db, key)
+    codes = [totp.new_recovery_code() for _ in range(totp.RECOVERY_CODE_COUNT)]
+    db.query(RecoveryCode).filter(RecoveryCode.institutionUserId == officer.id).delete(synchronize_session=False)
+    db.add_all(RecoveryCode(institutionUserId=officer.id, codeHash=totp.hash_recovery_code(c)) for c in codes)
+    db.commit()
+    return RecoveryCodesResponse(recoveryCodes=codes)

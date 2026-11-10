@@ -83,6 +83,18 @@ class EnrolConfirmResponse(LoginResponse):
     recoveryCodes: list[str]
 
 
+class RecoveryCodesRequest(BaseModel):
+    """Re-proves the second factor: a current 6-digit authenticator code. A recovery code is not accepted here."""
+
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class RecoveryCodesResponse(BaseModel):
+    """A fresh set of recovery codes, shown this once. Every earlier code, used or not, is dead."""
+
+    recoveryCodes: list[str]
+
+
 class LoginTotpRequest(BaseModel):
     """`code` is the 6-digit authenticator code or a one-time recovery code ("K7M2Q-X9RPA"; case, spaces and the dash
     are ignored). Anything else is a 422."""

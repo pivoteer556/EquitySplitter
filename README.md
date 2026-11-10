@@ -57,7 +57,7 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   the shared `login` bucket, a bad token does not (no email to key on); a malformed code is 422. On the first successful confirmation the response also carries `recoveryCodes` (see the Recovery codes bullet).
   `POST /auth/institution/login` was REMOVED (404): it returned a token on the password alone, bypassing both factors.
   The bearer endpoints `/auth/institution/totp/enroll` and `/confirm` remain. Planned, not built: user and owner
-  credentials, regenerating recovery codes, the admin role, reset, a back/restart control (an expired challenge means signing in
+  credentials, a screen for regenerating recovery codes (the endpoint exists), the admin role, reset, a back/restart control (an expired challenge means signing in
   again), a QR code (the login page shows the secret as text plus an otpauth link) and a 429 UI message.
 - **Recovery codes (officers)** — when an officer first confirms an authenticator at `POST /auth/login/totp/enroll-confirm`,
   the response also returns `recoveryCodes`: exactly 8 one-time codes like `K7M2Q-X9RPA` (alphabet
@@ -68,9 +68,15 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   conditional UPDATE, so concurrent requests cannot spend it twice), and a wrong or used one is the generic
   `401 Invalid credentials` counted in the shared `login` bucket (5 failures per 60 s, then 429); success resets it. A
   recovery code is refused at `enroll-confirm` (422) and cannot enrol or skip the second factor. Known limits: officers
-  who enrolled through the bearer endpoints `/auth/institution/totp/enroll` and `/confirm`, or before this change, have
-  no codes and there is no regeneration yet (planned); the codes appear on screen once and a reload on that screen loses
-  them (the session stays valid); about 49.5 bits is only acceptable behind the limiter; no admin reset or ADMIN role.
+  who enrolled through the bearer endpoints `/auth/institution/totp/enroll` and `/confirm`, or before this change, got
+  no codes at enrolment; they can get a set with `POST /auth/institution/totp/recovery-codes` (below). The codes appear
+  on screen once and a reload on that screen loses them (the session stays valid); about 49.5 bits is only acceptable
+  behind the limiter; no admin reset or ADMIN role.
+  **Regeneration:** a signed-in officer posts a current 6-digit authenticator code (a recovery code is refused, 422) and
+  receives 8 new codes; every old code, used or not, stops working (old rows deleted, new ones inserted in one
+  transaction). A wrong or replayed code, or no confirmed authenticator, is the generic `401 Invalid credentials` and
+  counts in the shared `login` bucket (5 failures per 60 s, then 429); success resets it. There is no screen for it yet
+  (planned: a signed-in officer settings page), so today only the API client method calls it.
 - **CORS** — `http://localhost:4200` and `http://127.0.0.1:4200` are always allowed. Set `CORS_ALLOW_ORIGINS` to a
   comma-separated list of extra origins (e.g. `https://site.example.net,https://other.example`) to allow a deployed
   frontend. Whitespace, empty entries, trailing slashes and `*` are ignored.

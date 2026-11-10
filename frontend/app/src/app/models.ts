@@ -78,6 +78,11 @@ export interface EnrolConfirmResponse extends LoginResponse {
   recoveryCodes: string[];
 }
 
+/** POST /auth/institution/totp/recovery-codes answer: a fresh set of one-time codes (the old set stops working), shown once. */
+export interface RecoveryCodesResponse {
+  recoveryCodes: string[];
+}
+
 /** POST /auth/login answer for an officer with an authenticator: no token yet, only a challenge for POST /auth/login/totp. */
 export interface SecondFactorChallenge {
   userType: 'institution_user';

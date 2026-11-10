@@ -1,12 +1,13 @@
 """One-time recovery codes for officers who lost their authenticator (2l step 3b)."""
 
 import re
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import select
 
 from app.models import RecoveryCode
-from tests.conftest import STRONG_PASSWORD, bearer
+from tests.conftest import STRONG_PASSWORD, bearer, sign_in_officer
 
 LOGIN = "/api/v1/auth/login"
 LOGIN_TOTP = "/api/v1/auth/login/totp"
@@ -127,3 +128,103 @@ def test_a_pending_restart_of_enrolment_does_not_mint_codes_until_confirmed(clie
     client.post(START, json={"challengeToken": token})
     client.post(START, json={"challengeToken": token})
     assert _use(client, "AAAAA-AAAAA", token).status_code == 401
+
+
+# --- 2l step 3c: an authenticated officer regenerates their codes -------------------------------------------------
+
+REGEN = "/api/v1/auth/institution/totp/recovery-codes"
+
+
+@pytest.fixture
+def signed_in(client, officer, clock):
+    """A bearer-signed-in officer with a confirmed authenticator and their first 8 codes."""
+    body = sign_in_officer(client, clock, EMAIL)
+    return {"headers": bearer(body["accessToken"]), "secret": body["totpSecret"], "codes": body["recoveryCodes"]}
+
+
+def _next_code(secret, clock):
+    import pyotp
+
+    return pyotp.TOTP(secret).at(clock["now"] + timedelta(seconds=30))  # the enrol step is spent; use the next one
+
+
+def _regen(client, signed_in, clock, code=None):
+    code = code or _next_code(signed_in["secret"], clock)
+    return client.post(REGEN, json={"code": code}, headers=signed_in["headers"])
+
+
+def test_regenerate_returns_eight_fresh_codes_and_kills_all_old_ones(client, signed_in, clock, session_factory):
+    old = signed_in["codes"]
+    assert _use(client, old[0]).status_code == 200  # one old code is already used
+    resp = _regen(client, signed_in, clock)
+    assert resp.status_code == 200, resp.text
+    new = resp.json()["recoveryCodes"]
+    assert len(new) == 8 and len(set(new)) == 8 and all(FORMAT.match(c) for c in new)
+    assert not set(new) & set(old)
+    with session_factory() as db:
+        rows = db.scalars(select(RecoveryCode)).all()
+    assert len(rows) == 8 and all(r.usedAt is None for r in rows)  # used and unused old rows are gone
+    token = _challenge(client)
+    for c in old[:4]:  # stay under the 5-failure limit
+        r = _use(client, c, token)
+        assert r.status_code == 401 and r.json() == {"detail": "Invalid credentials"}
+    assert _use(client, new[0]).status_code == 200
+
+
+def test_wrong_code_is_401_leaves_codes_untouched_and_counts(client, signed_in, clock, session_factory):
+    resp = _regen(client, signed_in, clock, "000000")
+    assert resp.status_code == 401 and resp.json() == {"detail": "Invalid credentials"}
+    with session_factory() as db:
+        assert len(db.scalars(select(RecoveryCode)).all()) == 8
+    assert _use(client, signed_in["codes"][0]).status_code == 200  # old codes still work
+    statuses = [_regen(client, signed_in, clock, "000000").status_code for _ in range(6)]
+    assert statuses[:5] == [401] * 5 and statuses[5] == 429  # the successful login above reset the budget
+
+
+def test_replayed_totp_step_is_refused(client, signed_in, clock):
+    code = _next_code(signed_in["secret"], clock)
+    assert _regen(client, signed_in, clock, code).status_code == 200
+    assert _regen(client, signed_in, clock, code).status_code == 401
+
+
+def test_the_enrolment_step_code_is_a_replay(client, signed_in, clock):
+    import pyotp
+
+    assert _regen(client, signed_in, clock, pyotp.TOTP(signed_in["secret"]).at(clock["now"])).status_code == 401
+
+
+def test_a_recovery_code_is_not_accepted_here(client, signed_in, clock):
+    resp = client.post(REGEN, json={"code": signed_in["codes"][0]}, headers=signed_in["headers"])
+    assert resp.status_code == 422
+
+
+def test_five_failures_then_429_with_retry_after_shared_with_login(client, signed_in, clock):
+    token = _challenge(client)
+    statuses = [_regen(client, signed_in, clock, "000000").status_code for _ in range(5)]
+    assert statuses == [401] * 5
+    locked = _regen(client, signed_in, clock)
+    assert locked.status_code == 429 and int(locked.headers["Retry-After"]) > 0
+    assert _use(client, signed_in["codes"][0], token).status_code == 429  # the login budget is the same bucket
+
+
+def test_login_failures_count_toward_the_regenerate_budget(client, signed_in, clock):
+    token = _challenge(client)
+    assert [_use(client, "AAAAA-AAAAA", token).status_code for _ in range(5)] == [401] * 5
+    assert _regen(client, signed_in, clock).status_code == 429
+
+
+def test_officer_without_a_confirmed_authenticator_gets_the_generic_refusal(client, officer, clock):
+    resp = client.post(REGEN, json={"code": "123456"}, headers=bearer(officer["accessToken"]))
+    assert resp.status_code == 401 and resp.json() == {"detail": "Invalid credentials"}
+    # a pending (unconfirmed) enrolment is the same
+    import pyotp
+
+    headers = bearer(officer["accessToken"])
+    secret = client.post("/api/v1/auth/institution/totp/enroll", headers=headers).json()["secret"]
+    resp = client.post(REGEN, json={"code": pyotp.TOTP(secret).at(clock["now"])}, headers=headers)
+    assert resp.status_code == 401 and resp.json() == {"detail": "Invalid credentials"}
+
+
+def test_requires_a_valid_officer_bearer(client, signed_in):
+    assert client.post(REGEN, json={"code": "123456"}).status_code == 401
+    assert client.post(REGEN, json={"code": "123456"}, headers=bearer("garbage")).status_code == 401
