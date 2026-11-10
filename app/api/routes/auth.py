@@ -207,7 +207,10 @@ def login_totp(payload: LoginTotpRequest, request: Request, db: Session = Depend
     step = None
     if credential is not None:
         step = totp.verify_code(
-            totp.decrypt_secret(credential.secretEncrypted), payload.code, now_utc_seconds(), credential.lastUsedStep
+            totp.decrypt_secret(credential.secretEncrypted),
+            payload.code,
+            auth_service.now_utc_seconds(),
+            credential.lastUsedStep,
         )
     if credential is None or step is None:
         _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")

@@ -1,5 +1,7 @@
 """Second sign-in step for officers with a confirmed authenticator (2l step 2)."""
 
+from datetime import timedelta
+
 import pyotp
 import pytest
 
@@ -58,6 +60,18 @@ def test_correct_code_completes_sign_in_with_the_normal_login_response(client, o
     assert body["role"] == "loan_officer" and body["institutionId"] == officer["institution"]["id"]
     # The issued token is a real session.
     assert client.post(CONFIRM, json={"code": "123456"}, headers=bearer(body["accessToken"])).status_code in (400, 409)
+
+
+def test_code_is_checked_against_the_auth_service_clock_not_real_time(client, enrolled, clock, monkeypatch):
+    """Regression for a CI flake: the route must follow app.services.auth's clock (what tests freeze), not a
+    directly imported real-time function. A route-level clock 10 minutes off must not matter."""
+    import app.api.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "now_utc_seconds", lambda: clock["now"] + timedelta(minutes=10))
+    resp = client.post(
+        LOGIN_TOTP, json={"challengeToken": _challenge(client), "code": _code(enrolled, clock, 1)}
+    )
+    assert resp.status_code == 200, resp.text
 
 
 def test_wrong_code_is_the_generic_401(client, enrolled, clock):
