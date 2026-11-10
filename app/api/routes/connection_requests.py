@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_user_or_institution_user, require_user_unrotated
+from app.api.deps.auth import Principal, require_user_or_institution_user_unrotated, require_user_unrotated
 from app.db.session import get_db
 from app.models import ConnectionRequest, InstitutionUser, Property, User, UserProperty
 from app.schemas.connection_request import (
@@ -11,7 +11,7 @@ from app.schemas.connection_request import (
     IncomingConnectionRequestRead,
 )
 from app.schemas.institution import PROFESSIONAL_ROLES
-from app.services.auth import refresh_and_store_user_token
+from app.services.auth import refresh_and_store_institution_token, refresh_and_store_user_token
 
 router = APIRouter()
 
@@ -78,12 +78,21 @@ def _incoming(db: Session, professional_id, limit: int, offset: int) -> list[Inc
 
 @router.get("/connection-requests", response_model=list[IncomingConnectionRequestRead] | list[ConnectionRequestRead])
 def list_connection_requests(
+    response: Response,
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    principal: Principal = Depends(require_user_or_institution_user),
+    principal: Principal = Depends(require_user_or_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
+    # The unrotated dependency leaves the session alone so a 422 on limit/offset cannot strand the caller; rotate
+    # here, on the success path only.
     if principal.user_type == "institution_user":
-        return _incoming(db, principal.user_id, limit, offset)
+        result = _incoming(db, principal.user_id, limit, offset)
+        officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
+        response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+        return result
     query = db.query(ConnectionRequest).filter(ConnectionRequest.buyerId == principal.user_id)
-    return query.order_by(*_ORDER).limit(limit).offset(offset).all()
+    rows = query.order_by(*_ORDER).limit(limit).offset(offset).all()
+    user = db.query(User).filter(User.id == principal.user_id).one()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
+    return rows

@@ -126,6 +126,18 @@ def require_user_or_institution_user(
     return _user_principal(response, db, claims)
 
 
+def require_user_or_institution_user_unrotated(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Like require_user_or_institution_user but leaves the stored session token alone. The endpoint rotates itself,
+    after success, with refresh_and_store_user_token / refresh_and_store_institution_token."""
+    claims = decode_token(db, _extract_bearer(authorization))
+    if claims.get("userType") == "institution_user":
+        return _institution_principal(None, db, claims)
+    return _user_principal(None, db, claims)
+
+
 def require_user_property_scope(
     property_id: UUID,
     principal: Principal,
