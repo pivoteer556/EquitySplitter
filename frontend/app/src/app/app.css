@@ -62,7 +62,7 @@ pre {
   max-width: 900px;
   margin: 0 auto;
   padding: 16px 24px 12px;
-  border-bottom: 2px solid var(--brand-amber);
+  border-bottom: 2px solid var(--brand-blue-dark); /* UI rule, needs 3:1 on the page; the amber mark stays in the logo */
 }
 
 /* Lockup: height drives size, width follows the viewBox. Fills come from brand tokens, never raw hex in the markup. */

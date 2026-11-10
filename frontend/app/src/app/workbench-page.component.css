@@ -56,7 +56,7 @@ section {
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #64748b;
+  color: var(--brand-blue-dark);
 }
 
 .value,
