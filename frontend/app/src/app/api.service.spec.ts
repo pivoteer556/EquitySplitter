@@ -83,10 +83,12 @@ describe('ApiService base URL', () => {
     expect(started).toEqual({ secret: 'S', otpauthUri: 'otpauth://x' });
     expect(api.getInstitutionToken()).toBe('');
 
-    api.enrolConfirm('chal', '123456').subscribe();
+    let confirmed: { recoveryCodes?: string[] } | undefined;
+    api.enrolConfirm('chal', '123456').subscribe((r) => (confirmed = r));
     const conf = http.expectOne(`${environment.apiBaseUrl}/auth/login/totp/enroll-confirm`);
     expect(conf.request.body).toEqual({ challengeToken: 'chal', code: '123456' });
-    conf.flush({ accessToken: 'officer-jwt', tokenType: 'Bearer', userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'inst-9' });
+    conf.flush({ accessToken: 'officer-jwt', tokenType: 'Bearer', userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'inst-9', recoveryCodes: ['AAAAA-BBBBB'] });
+    expect(confirmed?.recoveryCodes).toEqual(['AAAAA-BBBBB']);
     expect(api.getInstitutionToken()).toBe('officer-jwt');
     expect(api.getInstitutionId()).toBe('inst-9');
     api.clearTokens();

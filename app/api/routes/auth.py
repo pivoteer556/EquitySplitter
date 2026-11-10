@@ -1,4 +1,5 @@
 import hmac
+import re
 from datetime import UTC, datetime
 from typing import NoReturn
 from uuid import UUID
@@ -10,13 +11,14 @@ from app.api.deps.auth import Principal, platform_admin_principal, require_insti
 from app.api.routes.totp import TotpEnrollment
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import InstitutionUser, TokenRevocation, TotpCredential, User
+from app.models import InstitutionUser, RecoveryCode, TokenRevocation, TotpCredential, User
 from app.schemas.auth import (
     AcceptInviteRequest,
     AuthLoginRequest,
     AuthRegisterRequest,
     AuthTokenResponse,
     EnrolConfirmRequest,
+    EnrolConfirmResponse,
     EnrolmentChallenge,
     EnrolStartRequest,
     InstitutionBootstrapRequest,
@@ -204,6 +206,12 @@ def login_totp(payload: LoginTotpRequest, request: Request, db: Session = Depend
     key = _login_key("login", request, officer.email)
     _enforce_login_limit(db, key)
     credential = _confirmed_credential(db, officer.id)
+    if credential is not None and not re.fullmatch(r"\d{6}", payload.code):
+        # Not six digits, so it can only be a recovery code. Same failure, same budget as a wrong authenticator code.
+        if not _consume_recovery_code(db, officer.id, payload.code):
+            _fail_login(db, key, status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
+        login_limiter.reset(db, key)
+        return _officer_login_response(db, officer)
     step = None
     if credential is not None:
         step = totp.verify_code(
@@ -217,6 +225,27 @@ def login_totp(payload: LoginTotpRequest, request: Request, db: Session = Depend
     credential.lastUsedStep = step  # single use: the same or an older code is a replay next time
     login_limiter.reset(db, key)
     return _officer_login_response(db, officer)  # commits lastUsedStep with the session iat
+
+
+def _consume_recovery_code(db: Session, officer_id: UUID, code: str) -> bool:
+    """Spend the officer's matching unused recovery code. Compares against every unused row with no early exit, and the
+    spend is a conditional UPDATE so two concurrent requests cannot both redeem one code. Not committed here:
+    _officer_login_response commits it together with the session."""
+    wanted = totp.hash_recovery_code(code)
+    unused = (RecoveryCode.institutionUserId == officer_id, RecoveryCode.usedAt.is_(None))
+    rows = db.query(RecoveryCode).filter(*unused).all()
+    match = None
+    for row in rows:
+        if hmac.compare_digest(row.codeHash, wanted):
+            match = row
+    if match is None:
+        return False
+    spent = (
+        db.query(RecoveryCode)
+        .filter(RecoveryCode.id == match.id, RecoveryCode.usedAt.is_(None))
+        .update({RecoveryCode.usedAt: datetime.now(UTC)}, synchronize_session=False)
+    )
+    return spent == 1
 
 
 def _officer_from_challenge(db: Session, token: str, purpose: str) -> InstitutionUser | None:
@@ -263,7 +292,7 @@ def login_totp_enroll_start(payload: EnrolStartRequest, request: Request, db: Se
     return TotpEnrollment(secret=secret, otpauthUri=totp.provisioning_uri(secret, officer.email))
 
 
-@router.post("/login/totp/enroll-confirm", response_model=LoginResponse)
+@router.post("/login/totp/enroll-confirm", response_model=EnrolConfirmResponse)
 def login_totp_enroll_confirm(payload: EnrolConfirmRequest, request: Request, db: Session = Depends(get_db)):
     """First sign-in, step 2b: prove the authenticator works. Failures are the generic 401 and count toward the shared
     "login" budget, exactly like a wrong code at /login/totp."""
@@ -283,7 +312,10 @@ def login_totp_enroll_confirm(payload: EnrolConfirmRequest, request: Request, db
     credential.confirmedAt = datetime.now(UTC)
     credential.lastUsedStep = step
     login_limiter.reset(db, key)
-    return _officer_login_response(db, officer)  # commits the credential with the session iat
+    codes = [totp.new_recovery_code() for _ in range(totp.RECOVERY_CODE_COUNT)]
+    db.add_all(RecoveryCode(institutionUserId=officer.id, codeHash=totp.hash_recovery_code(c)) for c in codes)
+    base = _officer_login_response(db, officer)  # commits the credential and codes with the session iat
+    return EnrolConfirmResponse(**base.model_dump(), recoveryCodes=codes)
 
 
 @router.post("/accept-invite", response_model=AuthTokenResponse)

@@ -34,3 +34,10 @@ def test_offline_render_creates_totp_credentials_one_per_user(capsys):
     sql = capsys.readouterr().out
     assert 'CREATE TABLE "totpCredentials"' in sql
     assert "UNIQUE (" in sql and '"institutionUserId"' in sql and "ON DELETE CASCADE" in sql
+
+
+def test_offline_render_creates_recovery_codes_with_hash_and_cascade(capsys):
+    command.upgrade(Config("alembic.ini"), "0011_user_platform_admin:0012_recovery_codes", sql=True)
+    sql = capsys.readouterr().out
+    assert 'CREATE TABLE "recoveryCodes"' in sql and '"codeHash"' in sql and '"usedAt"' in sql
+    assert "ON DELETE CASCADE" in sql

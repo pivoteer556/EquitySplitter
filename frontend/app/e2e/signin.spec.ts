@@ -527,6 +527,7 @@ test('an officer with no authenticator is enrolled at first sign-in: password al
 
   await page.locator('#enrol-code').fill(totpCode(secret));
   await page.getByRole('button', { name: 'Verify and sign in' }).click();
+  await page.locator('#recovery-continue').click();
   await expect(page).toHaveURL(/\/workbench$/);
   expect((await tokens())[0]).toBeTruthy();
 
@@ -539,4 +540,62 @@ test('an officer with no authenticator is enrolled at first sign-in: password al
   expect((await (await again).json()).secondFactorRequired).toBe(true);
   await expect(page.locator('#login-code')).toBeVisible();
   await expect(page.locator('#enrol-form')).toHaveCount(0);
+});
+
+test('recovery codes: shown once after enrolment, no navigation before Continue; each signs in once; a reused or wrong code is rejected', async ({ page }) => {
+  const officer = await makeUser('recovery');
+  const tokens = () => page.evaluate(() => [localStorage.getItem('institutionToken'), localStorage.getItem('userToken')]);
+  const signInToCodeStep = async () => {
+    await fill(page, officer.email, officer.password);
+    await loginButton(page).click();
+    await expect(page.locator('#login-code')).toBeVisible();
+    await expect(page.locator('#recovery-codes')).toHaveCount(0); // never shown again
+  };
+  const tryCode = async (code: string) => {
+    await page.locator('#login-code').fill(code);
+    const res = page.waitForResponse('**/api/v1/auth/login/totp');
+    await page.getByRole('button', { name: 'Verify' }).click();
+    return (await res).status();
+  };
+
+  await fill(page, officer.email, officer.password);
+  await loginButton(page).click();
+  await expect(page.locator('#enrol-form')).toBeVisible();
+  await expect(page.locator('#recovery-codes')).toHaveCount(0); // not before the right code
+  const secret = (await page.locator('#enrol-secret').innerText()).trim();
+  const valid = [-2, -1, 0, 1, 2].map((o) => totpCode(secret, o));
+  const wrong = ['000000', '111111', '222222'].find((c) => !valid.includes(c))!;
+  await page.locator('#enrol-code').fill(wrong);
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
+  await expect(alertBox(page)).toBeVisible();
+  await expect(page.locator('#recovery-codes')).toHaveCount(0);
+
+  await page.locator('#enrol-code').fill(totpCode(secret));
+  await page.getByRole('button', { name: 'Verify and sign in' }).click();
+  await expect(page.locator('#recovery-codes')).toBeVisible();
+  const codes = (await page.locator('#recovery-codes').innerText()).match(/[A-Z2-9]{5}-[A-Z2-9]{5}/g)!;
+  expect(codes).toHaveLength(8);
+  expect(new Set(codes).size).toBe(8);
+  await expect(page.locator('body')).toContainText('Save these recovery codes now. They will not be shown again.');
+  await page.waitForTimeout(500); // give a premature navigation time to happen
+  expect(new URL(page.url()).pathname).toBe('/login');
+  await page.locator('#recovery-continue').click();
+  await expect(page).toHaveURL(/\/workbench$/);
+
+  // Lost authenticator: a recovery code is the second step, and it works exactly once.
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await signInToCodeStep();
+  expect(await tryCode(codes[0])).toBe(200);
+  await expect(page).toHaveURL(/\/workbench$/);
+  expect((await tokens())[0]).toBeTruthy();
+
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await signInToCodeStep();
+  expect(await tryCode(codes[0])).toBe(401); // reuse
+  await expect(alertBox(page)).toBeVisible();
+  await expectNoSession(page);
+  expect(await tryCode('ZZZZZ-ZZZZZ')).toBe(401); // never issued
+  await expectNoSession(page);
+  expect(await tryCode(codes[1])).toBe(200); // a different, unused code still works
+  await expect(page).toHaveURL(/\/workbench$/);
 });

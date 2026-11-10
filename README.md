@@ -45,7 +45,7 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   expired challenge, is `401 Invalid credentials`; a malformed code is 422. Failures count in the same `login` bucket as
   the password step (5 per 60 s per IP+email), and a correct password on such an officer does NOT reset that counter,
   only a finished sign-in does. Replay protection is the credential's `lastUsedStep`. Known limits: the challenge token
-  is not single-use (the code is); users and owners have no credential yet; recovery codes and reset are planned.
+  is not single-use (the code is); users and owners have no credential yet; reset is planned (recovery codes: see the Recovery codes bullet).
 - **Enrolment at first sign-in (officers)** — when an officer with NO confirmed authenticator passes the password check,
   `POST /auth/login` returns `{userType: "institution_user", enrolmentRequired: true, challengeToken}` and no access
   token. The challenge is a 5-minute JWT with purpose `enrolment_challenge`, distinct from the second step's
@@ -54,11 +54,23 @@ Design specs and schema diagrams live in [docs/specs/](docs/specs/).
   `POST /auth/login/totp/enroll-confirm` `{challengeToken, code}` confirms it (sets `confirmedAt` and `lastUsedStep`) and
   returns the normal login response, resetting the limiter. A wrong code, a bad or expired token, or an officer who is
   already enrolled is `401 Invalid credentials`; wrong codes (and an already-enrolled officer on `enroll-confirm`) count in
-  the shared `login` bucket, a bad token does not (no email to key on); a malformed code is 422.
+  the shared `login` bucket, a bad token does not (no email to key on); a malformed code is 422. On the first successful confirmation the response also carries `recoveryCodes` (see the Recovery codes bullet).
   `POST /auth/institution/login` was REMOVED (404): it returned a token on the password alone, bypassing both factors.
   The bearer endpoints `/auth/institution/totp/enroll` and `/confirm` remain. Planned, not built: user and owner
-  credentials, recovery codes, the admin role, reset, a back/restart control (an expired challenge means signing in
+  credentials, regenerating recovery codes, the admin role, reset, a back/restart control (an expired challenge means signing in
   again), a QR code (the login page shows the secret as text plus an otpauth link) and a 429 UI message.
+- **Recovery codes (officers)** — when an officer first confirms an authenticator at `POST /auth/login/totp/enroll-confirm`,
+  the response also returns `recoveryCodes`: exactly 8 one-time codes like `K7M2Q-X9RPA` (alphabet
+  `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, about 49.5 bits each), shown once and never retrievable. Only an HMAC-SHA256 hash
+  (key derived by HKDF from `JWT_SECRET_SEED`) is stored in `recoveryCodes` (migration 0012), so rotating the seed also
+  invalidates unused codes; no plaintext code is stored or logged. `POST /auth/login/totp` accepts a recovery code in
+  `code` in place of the 6 digits (case, spaces and the dash ignored); a valid one signs in and is consumed (a
+  conditional UPDATE, so concurrent requests cannot spend it twice), and a wrong or used one is the generic
+  `401 Invalid credentials` counted in the shared `login` bucket (5 failures per 60 s, then 429); success resets it. A
+  recovery code is refused at `enroll-confirm` (422) and cannot enrol or skip the second factor. Known limits: officers
+  who enrolled through the bearer endpoints `/auth/institution/totp/enroll` and `/confirm`, or before this change, have
+  no codes and there is no regeneration yet (planned); the codes appear on screen once and a reload on that screen loses
+  them (the session stays valid); about 49.5 bits is only acceptable behind the limiter; no admin reset or ADMIN role.
 - **CORS** — `http://localhost:4200` and `http://127.0.0.1:4200` are always allowed. Set `CORS_ALLOW_ORIGINS` to a
   comma-separated list of extra origins (e.g. `https://site.example.net,https://other.example`) to allow a deployed
   frontend. Whitespace, empty entries, trailing slashes and `*` are ignored.

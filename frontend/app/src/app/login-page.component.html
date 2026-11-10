@@ -7,7 +7,18 @@
 
   <section>
     <h2>Sign In</h2>
-    @if (enrolment) {
+    @if (recoveryCodes) {
+    <div id="recovery">
+      <p>Save these recovery codes now. They will not be shown again.</p>
+      <p>If you lose your authenticator, each code can be used once in place of the 6-digit code when you sign in.</p>
+      <ul id="recovery-codes">
+        @for (code of recoveryCodes; track code) {
+        <li><code>{{ code }}</code></li>
+        }
+      </ul>
+      <button id="recovery-continue" type="button" (click)="continueAfterRecoveryCodes()">Continue</button>
+    </div>
+    } @else if (enrolment) {
     <form id="enrol-form" (ngSubmit)="submitEnrolment()" ngNativeValidate>
       <p>Add this account to an authenticator app: open the link, or type the key in by hand. Then enter the 6-digit code it shows.</p>
       <p><a id="enrol-link" [href]="enrolment.otpauthUri">Open in authenticator app</a></p>
@@ -19,9 +30,9 @@
     </form>
     } @else if (challengeToken) {
     <form id="code-form" (ngSubmit)="submitCode()" ngNativeValidate>
-      <label for="login-code">Authenticator code</label>
-      <input id="login-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" required
-        pattern="[0-9]{6}" maxlength="6" title="The 6-digit code from your authenticator app." [(ngModel)]="loginCode" />
+      <label for="login-code">Authenticator code or recovery code</label>
+      <input id="login-code" name="code" type="text" autocomplete="one-time-code" required aria-describedby="login-code-hint" [(ngModel)]="loginCode" />
+      <p id="login-code-hint">Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
       <button type="submit" [disabled]="loading">{{ loading ? 'Signing in...' : 'Verify' }}</button>
     </form>
     } @else {

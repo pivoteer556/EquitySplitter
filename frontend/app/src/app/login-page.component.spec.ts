@@ -231,15 +231,26 @@ describe('LoginPageComponent', () => {
       expect(codeInput(fixture)).toBeNull();
     });
 
-    it('a password-only result shows a 6-digit one-time-code field and does not navigate', () => {
+    it('a password-only result shows a one-time-code field (authenticator or recovery code) and does not navigate', () => {
       const { fixture, nav } = twoStep();
       const input = codeInput(fixture)!;
       expect(input).toBeTruthy();
-      expect(input.getAttribute('inputmode')).toBe('numeric');
       expect(input.getAttribute('autocomplete')).toBe('one-time-code');
-      expect(input.getAttribute('pattern')).toBe('[0-9]{6}');
+      expect(input.getAttribute('pattern')).toBeNull(); // a recovery code may be typed here too
+      expect(input.getAttribute('maxlength')).toBeNull();
+      expect(input.getAttribute('inputmode')).toBeNull();
       expect(input.required).toBeTrue();
+      expect((fixture.nativeElement as HTMLElement).querySelector('#code-form')?.textContent).toContain('Enter the 6-digit code from your authenticator app, or one of your recovery codes.');
       expect(nav).not.toHaveBeenCalled();
+    });
+
+    it('a recovery code is sent to the server unchanged', () => {
+      const { c, nav, totpCalls, fixture } = twoStep();
+      c.loginCode = 'abcde-23456';
+      c.submitCode();
+      fixture.detectChanges();
+      expect(totpCalls).toEqual([['chal', 'abcde-23456']]);
+      expect(nav).toHaveBeenCalledWith('/workbench');
     });
 
     it('submitting the code sends the challenge and goes to /workbench', () => {
@@ -264,6 +275,7 @@ describe('LoginPageComponent', () => {
   describe('enrolment at first sign-in', () => {
     const ENROL = { userType: 'institution_user', enrolmentRequired: true, challengeToken: 'chal' };
     const OFFICER = { userType: 'institution_user', isPlatformAdmin: false, role: 'admin', institutionId: 'i1' };
+    const CODES = ['AAAAA-BBBBB', 'CCCCC-DDDDD'];
     function enrol(confirmErr?: unknown, startErr?: unknown) {
       const startCalls: string[] = [];
       const confirmCalls: string[][] = [];
@@ -275,7 +287,7 @@ describe('LoginPageComponent', () => {
         },
         enrolConfirm: (t: string, c: string) => {
           confirmCalls.push([t, c]);
-          return confirmErr === undefined ? of(OFFICER) : throwError(() => confirmErr);
+          return confirmErr === undefined ? of({ ...OFFICER, recoveryCodes: CODES }) : throwError(() => confirmErr);
         },
       };
       TestBed.configureTestingModule({ imports: [LoginPageComponent], providers: [{ provide: ApiService, useValue: api }, provideRouter([])] });
@@ -306,12 +318,25 @@ describe('LoginPageComponent', () => {
       expect(nav).not.toHaveBeenCalled();
     });
 
-    it('confirming sends the challenge and the code, then goes to /workbench', () => {
-      const { c, nav, confirmCalls, fixture } = enrol();
+    it('confirming sends the challenge and the code, then shows the recovery codes once and does NOT navigate yet', () => {
+      const { c, nav, confirmCalls, fixture, root } = enrol();
       c.enrolCode = '123456';
       c.submitEnrolment();
       fixture.detectChanges();
       expect(confirmCalls).toEqual([['chal', '123456']]);
+      expect(root.querySelector('#enrol-form')).toBeNull();
+      expect(root.querySelector('#recovery-codes')?.textContent).toContain('AAAAA-BBBBB');
+      expect(root.querySelector('#recovery-codes')?.textContent).toContain('CCCCC-DDDDD');
+      expect(root.textContent).toContain('Save these recovery codes now. They will not be shown again.');
+      expect(nav).not.toHaveBeenCalled();
+    });
+
+    it('Continue goes to /workbench', () => {
+      const { c, nav, fixture, root } = enrol();
+      c.enrolCode = '123456';
+      c.submitEnrolment();
+      fixture.detectChanges();
+      root.querySelector<HTMLButtonElement>('#recovery-continue')!.click();
       expect(nav).toHaveBeenCalledWith('/workbench');
     });
 

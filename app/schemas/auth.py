@@ -77,9 +77,18 @@ class EnrolConfirmRequest(EnrolStartRequest):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class EnrolConfirmResponse(LoginResponse):
+    """The normal sign-in plus the officer's recovery codes, shown this once and never retrievable again."""
+
+    recoveryCodes: list[str]
+
+
 class LoginTotpRequest(BaseModel):
+    """`code` is the 6-digit authenticator code or a one-time recovery code ("K7M2Q-X9RPA"; case, spaces and the dash
+    are ignored). Anything else is a 422."""
+
     challengeToken: str
-    code: str = Field(pattern=r"^\d{6}$")
+    code: str = Field(pattern=r"^(\d{6}|[A-Za-z0-9 \-]{10,16})$")
 
 
 class AcceptInviteRequest(BaseModel):

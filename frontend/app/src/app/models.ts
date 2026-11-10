@@ -73,6 +73,11 @@ export interface LoginResponse extends AuthTokenResponse {
   institutionId: string | null;
 }
 
+/** POST /auth/login/totp/enroll-confirm answer: a normal login plus the one-time recovery codes, shown once and never retrievable again. */
+export interface EnrolConfirmResponse extends LoginResponse {
+  recoveryCodes: string[];
+}
+
 /** POST /auth/login answer for an officer with an authenticator: no token yet, only a challenge for POST /auth/login/totp. */
 export interface SecondFactorChallenge {
   userType: 'institution_user';

@@ -126,11 +126,12 @@ export async function makeTotpOfficer(tag: string): Promise<TestUser & { secret:
   return { ...user, secret };
 }
 
-/** UI: after Login on a never-enrolled officer, completes the enrolment step with a real code. Returns the secret. */
+/** UI: after Login on a never-enrolled officer, completes the enrolment step with a real code and clicks Continue past the recovery codes. Returns the secret. */
 export async function completeEnrolment(page: Page): Promise<string> {
   await expect(page.locator('#enrol-secret')).toBeVisible();
   const secret = (await page.locator('#enrol-secret').innerText()).trim();
   await page.locator('#enrol-code').fill(totpCode(secret));
   await page.getByRole('button', { name: 'Verify and sign in' }).click();
+  await page.locator('#recovery-continue').click();
   return secret;
 }

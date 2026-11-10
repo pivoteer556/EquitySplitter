@@ -21,6 +21,8 @@ export class LoginPageComponent {
   enrolCode = '';
   enrolChallengeToken = ''; // set only when the officer has no authenticator yet and must enrol
   enrolment: TotpEnrollment | null = null;
+  recoveryCodes: string[] | null = null; // shown once after enrolment; the officer is signed in but stays here until Continue
+  private enrolled: LoginResponse | null = null;
 
   error = '';
   loading = false;
@@ -77,9 +79,17 @@ export class LoginPageComponent {
     this.loading = true;
     const { enrolChallengeToken: challengeToken, enrolCode: code } = this; // the SUBMITTED values, even if edited while pending
     this.api.enrolConfirm(challengeToken, code).subscribe({
-      next: (res) => this.finish(res),
+      next: (res) => {
+        this.enrolled = res;
+        this.recoveryCodes = res.recoveryCodes;
+        this.loading = false;
+      },
       error: (err) => this.fail(err, 'Incorrect or expired code. Check your authenticator app and try again.'),
     });
+  }
+
+  continueAfterRecoveryCodes(): void {
+    if (this.enrolled) this.finish(this.enrolled);
   }
 
   submitCode(): void {

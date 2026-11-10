@@ -7,6 +7,7 @@ import { environment } from '../environments/environment';
 import {
   Acknowledgement,
   AuthTokenResponse,
+  EnrolConfirmResponse,
   EnrolmentChallenge,
   Institution,
   InstitutionBootstrapResponse,
@@ -78,9 +79,9 @@ export class ApiService {
     return this.http.post<TotpEnrollment>(`${this.baseUrl}/auth/login/totp/enroll-start`, { challengeToken });
   }
 
-  /** Confirms the first code; the answer is a normal login, stored exactly as login does. */
-  enrolConfirm(challengeToken: string, code: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${this.baseUrl}/auth/login/totp/enroll-confirm`, { challengeToken, code }).pipe(tap((res) => this.storeLogin(res)));
+  /** Confirms the first code; the answer is a normal login (stored exactly as login does) plus the one-time recovery codes. */
+  enrolConfirm(challengeToken: string, code: string): Observable<EnrolConfirmResponse> {
+    return this.http.post<EnrolConfirmResponse>(`${this.baseUrl}/auth/login/totp/enroll-confirm`, { challengeToken, code }).pipe(tap((res) => this.storeLogin(res)));
   }
 
   private storeLogin(res: LoginResponse): void {
