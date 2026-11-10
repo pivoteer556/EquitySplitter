@@ -1,14 +1,14 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_institution_user
+from app.api.deps.auth import Principal, require_institution_user_unrotated
 from app.api.routes.equity_splitter import _readable_property
 from app.db.session import get_db
-from app.models import PropertyListing
+from app.models import InstitutionUser, PropertyListing
 from app.models.property_listing import EDITABLE_LISTING_STATUSES, LISTING_TRANSITIONS
 from app.schemas.property_listing import (
     PropertyListingCreate,
@@ -16,8 +16,18 @@ from app.schemas.property_listing import (
     PropertyListingTransition,
     PropertyListingUpdate,
 )
+from app.services.auth import refresh_and_store_institution_token
 
 router = APIRouter()
+
+
+def _rotate_session(db: Session, principal: Principal, response: Response) -> None:
+    """Rotate the officer's session token only after the handler succeeded. A 4xx (404/409/422) cannot carry
+    X-Refreshed-Token, so rotating up front (require_institution_user) would strand the caller with a dead token.
+    Same pattern as regenerate_recovery_codes and the TOTP enroll/confirm endpoints."""
+    officer = db.get(InstitutionUser, principal.user_id)
+    assert officer is not None  # the auth dependency just loaded this row
+    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
 
 
 @router.post(
@@ -26,7 +36,8 @@ router = APIRouter()
 def create_listing(
     property_id: str,
     payload: PropertyListingCreate,
-    principal: Principal = Depends(require_institution_user),
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, property_id)  # another institution's property looks nonexistent
@@ -34,22 +45,26 @@ def create_listing(
     db.add(listing)
     db.commit()
     db.refresh(listing)
+    _rotate_session(db, principal, response)
     return listing
 
 
 @router.get("/properties/{property_id}/listings", response_model=list[PropertyListingRead])
 def list_listings(
     property_id: str,
-    principal: Principal = Depends(require_institution_user),
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, property_id)
-    return (
+    listings = (
         db.query(PropertyListing)
         .filter(PropertyListing.propertyId == prop.id)
         .order_by(PropertyListing.createdAt.desc(), PropertyListing.id)
         .all()
     )
+    _rotate_session(db, principal, response)
+    return listings
 
 
 def _own_listing(db: Session, principal: Principal, listing_id: str) -> PropertyListing:
@@ -97,7 +112,8 @@ def _apply_transition(db: Session, listing: PropertyListing, to: str) -> None:
 def transition_listing(
     listing_id: str,
     payload: PropertyListingTransition,
-    principal: Principal = Depends(require_institution_user),
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     listing = _own_listing(db, principal, listing_id)
@@ -108,6 +124,7 @@ def transition_listing(
         db.rollback()
         raise HTTPException(status_code=409, detail=_ALREADY_LISTED) from None
     db.refresh(listing)
+    _rotate_session(db, principal, response)
     return listing
 
 
@@ -115,7 +132,8 @@ def transition_listing(
 def update_listing(
     listing_id: str,
     payload: PropertyListingUpdate,
-    principal: Principal = Depends(require_institution_user),
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     listing = _own_listing(db, principal, listing_id)
@@ -125,4 +143,5 @@ def update_listing(
         setattr(listing, field, value)
     db.commit()
     db.refresh(listing)
+    _rotate_session(db, principal, response)
     return listing
