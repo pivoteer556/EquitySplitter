@@ -52,4 +52,9 @@ describe('WorkbenchPageComponent owner access', () => {
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).querySelector('#invite-link')).toBeNull();
   });
+
+  it('links to the security page from the header', () => {
+    const link = (setup().nativeElement as HTMLElement).querySelector('a#security-link');
+    expect(link?.getAttribute('href')).toBe('/security');
+  });
 });

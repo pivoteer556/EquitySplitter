@@ -75,7 +75,19 @@ def require_institution_user(
     return _institution_principal(response, db, claims)
 
 
-def _institution_principal(response: Response, db: Session, claims: dict) -> Principal:
+def require_institution_user_unrotated(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Like require_institution_user but leaves the stored session token alone. For endpoints that can reject the
+    caller AFTER authentication (a wrong TOTP code): a 401 cannot carry X-Refreshed-Token, so rotating first would
+    strand the caller with a dead token. Such an endpoint rotates itself, after success, with
+    refresh_and_store_institution_token."""
+    claims = decode_token(db, _extract_bearer(authorization))
+    return _institution_principal(None, db, claims)
+
+
+def _institution_principal(response: Response | None, db: Session, claims: dict) -> Principal:
     if claims.get("userType") != "institution_user":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
 
@@ -86,8 +98,8 @@ def _institution_principal(response: Response, db: Session, claims: dict) -> Pri
 
     ensure_institution_not_revoked(db, inst_user.id)
     validate_active_token_iat(inst_user.lastTokenIssuedAt, claims.get("iat"))
-    refreshed = refresh_and_store_institution_token(db, inst_user)
-    response.headers["X-Refreshed-Token"] = refreshed
+    if response is not None:
+        response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, inst_user)
     return Principal(user_id=inst_user.id, user_type="institution_user", institution_id=inst_user.institutionId)
 
 

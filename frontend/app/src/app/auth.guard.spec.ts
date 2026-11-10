@@ -66,4 +66,8 @@ describe('route guards', () => {
     expect(by('listings').canActivate).toEqual([authGuard]);
     expect(by('login').canActivate).toBeUndefined();
   });
+
+  it('protects /security with officerGuard', () => {
+    expect(routes.find((r) => r.path === 'security')!.canActivate).toEqual([officerGuard]);
+  });
 });

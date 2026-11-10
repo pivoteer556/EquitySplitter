@@ -228,3 +228,25 @@ def test_officer_without_a_confirmed_authenticator_gets_the_generic_refusal(clie
 def test_requires_a_valid_officer_bearer(client, signed_in):
     assert client.post(REGEN, json={"code": "123456"}).status_code == 401
     assert client.post(REGEN, json={"code": "123456"}, headers=bearer("garbage")).status_code == 401
+
+
+def test_a_rejected_code_does_not_replace_the_session_token(client, signed_in, clock):
+    """The 401 carries no X-Refreshed-Token, so a rotation on a rejected attempt would strand the caller with a dead
+    token. Tokens have a per-second iat: advance the clock so a rotation would really produce a different token."""
+    good = _next_code(signed_in["secret"], clock)
+    clock["now"] += timedelta(seconds=5)
+    wrong = _regen(client, signed_in, clock, "000000")
+    assert wrong.status_code == 401 and "X-Refreshed-Token" not in wrong.headers
+    clock["now"] += timedelta(seconds=5)
+    assert _regen(client, signed_in, clock, good).status_code == 200  # the ORIGINAL token still works
+
+
+def test_a_replayed_code_does_not_replace_the_session_token(client, signed_in, clock):
+    first = _next_code(signed_in["secret"], clock)
+    resp = _regen(client, signed_in, clock, first)
+    assert resp.status_code == 200
+    headers = bearer(resp.headers["X-Refreshed-Token"])  # success still hands back the rotated token
+    clock["now"] += timedelta(seconds=5)
+    assert client.post(REGEN, json={"code": first}, headers=headers).status_code == 401  # replay
+    clock["now"] += timedelta(seconds=5)
+    assert client.get("/api/v1/listings", headers=headers).status_code == 200  # the token from the success still works

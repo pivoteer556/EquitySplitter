@@ -1,14 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { ApiService } from './api.service';
 import { PropertyOwnerStatus } from './models';
 
 @Component({
   selector: 'app-workbench-page',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './workbench-page.component.html',
   styleUrl: './workbench-page.component.css',
 })

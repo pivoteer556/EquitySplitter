@@ -7,7 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, platform_admin_principal, require_institution_user
+from app.api.deps.auth import (
+    Principal,
+    platform_admin_principal,
+    require_institution_user,
+    require_institution_user_unrotated,
+)
 from app.api.routes.totp import TotpEnrollment
 from app.core.config import settings
 from app.db.session import get_db
@@ -359,12 +364,14 @@ def institution_revoke(
 def regenerate_recovery_codes(
     payload: RecoveryCodesRequest,
     request: Request,
-    principal: Principal = Depends(require_institution_user),
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     """Replace the signed-in officer's recovery codes. Needs a current authenticator code (a recovery code does not
     work here); every failure, including no confirmed authenticator, is the generic 401 and counts toward the shared
-    "login" budget. Old rows are deleted and the new ones inserted in one commit, so a failure leaves the old set."""
+    "login" budget. Old rows are deleted and the new ones inserted in one commit, so a failure leaves the old set.
+    The session token rotates only on success: a rejected attempt cannot return X-Refreshed-Token."""
     officer = db.get(InstitutionUser, principal.user_id)
     assert officer is not None  # require_institution_user just loaded this row
     key = _login_key("login", request, officer.email)
@@ -386,4 +393,5 @@ def regenerate_recovery_codes(
     db.query(RecoveryCode).filter(RecoveryCode.institutionUserId == officer.id).delete(synchronize_session=False)
     db.add_all(RecoveryCode(institutionUserId=officer.id, codeHash=totp.hash_recovery_code(c)) for c in codes)
     db.commit()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
     return RecoveryCodesResponse(recoveryCodes=codes)

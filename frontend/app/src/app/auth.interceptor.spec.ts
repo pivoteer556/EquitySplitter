@@ -21,8 +21,8 @@ describe('authInterceptor', () => {
     expect(nav).toHaveBeenCalledWith('/login');
   });
 
-  for (const path of ['/api/v1/auth/institution/activate', '/api/v1/auth/accept-invite']) {
-    it(`keeps the user on the page when ${path} answers 401 (a bad link is not a lost session)`, () => {
+  for (const path of ['/api/v1/auth/institution/activate', '/api/v1/auth/accept-invite', '/api/v1/auth/institution/totp/recovery-codes']) {
+    it(`keeps the user on the page when ${path} answers 401 (a bad link or a wrong code is not a lost session)`, () => {
       const { nav, http, ctl } = setup();
       http.post(path, {}).subscribe({ error: () => undefined });
       ctl.expectOne(path).flush({}, { status: 401, statusText: 'Unauthorized' });

@@ -1,0 +1,35 @@
+<div class="security-shell">
+  <header class="hero">
+    <p class="eyebrow">Shared Mortgage Platform</p>
+    <h1>Security</h1>
+    <p>Generate new recovery codes for your account.</p>
+  </header>
+
+  <section>
+    <h2>Recovery codes</h2>
+    <form id="security-form" (ngSubmit)="regenerate()" ngNativeValidate>
+      <p>Enter the current 6-digit code from your authenticator app. Your old recovery codes stop working.</p>
+      <label for="security-code">Authenticator code</label>
+      <input id="security-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" required
+        pattern="[0-9]{6}" maxlength="6" title="The 6-digit code from your authenticator app." [(ngModel)]="code" />
+      <button id="security-submit" type="submit" [disabled]="!codeValid || loading">{{ loading ? 'Generating...' : 'Generate new codes' }}</button>
+    </form>
+
+    @if (error) {
+      <p id="security-error" class="error" role="alert">{{ error }}</p>
+    }
+
+    @if (recoveryCodes) {
+    <!-- Same wording and markup as the enrolment display in login-page; copied, not shared, to leave the login page untouched. -->
+    <div id="security-recovery">
+      <p>Save these recovery codes now. They will not be shown again.</p>
+      <p>If you lose your authenticator, each code can be used once in place of the 6-digit code when you sign in.</p>
+      <ul id="security-codes">
+        @for (c of recoveryCodes; track c) {
+        <li><code>{{ c }}</code></li>
+        }
+      </ul>
+    </div>
+    }
+  </section>
+</div>
