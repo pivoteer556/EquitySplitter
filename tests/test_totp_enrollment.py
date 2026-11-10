@@ -1,5 +1,7 @@
 """Authenticator-app (TOTP) enrolment for institution users (2l step 1)."""
 
+from datetime import timedelta
+
 import pyotp
 import pytest
 
@@ -120,3 +122,57 @@ def test_buyer_token_is_refused(client):
 @pytest.mark.parametrize("path", [ENROLL, CONFIRM])
 def test_unauthenticated_calls_are_refused(client, path):
     assert client.post(path, json={"code": "123456"}).status_code == 401
+
+
+# A 4xx cannot carry X-Refreshed-Token (the frontend only applies it on success), so rotating the stored session token
+# before the handler can reject would strand the caller. Token iat is per second: advance the clock so a rotation
+# would really produce a different token, then show the ORIGINAL token still works.
+LISTINGS = "/api/v1/listings"
+
+
+def test_rejected_confirm_leaves_the_session_token_working(client, officer, clock):
+    secret = _enroll(client, officer).json()["secret"]
+    clock["now"] += timedelta(seconds=5)
+    wrong = "000000" if _code(secret, clock) != "000000" else "111111"
+    resp = _confirm(client, officer["accessToken"], wrong)
+    assert resp.status_code == 400 and "X-Refreshed-Token" not in resp.headers
+    clock["now"] += timedelta(seconds=5)
+    assert client.get(LISTINGS, headers=bearer(officer["accessToken"])).status_code == 200
+
+
+def test_rate_limited_confirm_leaves_the_session_token_working(client, officer, clock):
+    secret = _enroll(client, officer).json()["secret"]
+    wrong = "000000" if _code(secret, clock) != "000000" else "111111"
+    for _ in range(5):
+        _confirm(client, officer["accessToken"], wrong)
+    clock["now"] += timedelta(seconds=5)
+    assert _confirm(client, officer["accessToken"], wrong).status_code == 429
+    clock["now"] += timedelta(seconds=5)
+    assert client.get(LISTINGS, headers=bearer(officer["accessToken"])).status_code == 200
+
+
+def test_enroll_conflict_leaves_the_session_token_working(client, officer, clock):
+    secret = _enroll(client, officer).json()["secret"]
+    confirmed = _confirm(client, officer["accessToken"], _code(secret, clock))
+    assert confirmed.status_code == 204
+    token = confirmed.headers["X-Refreshed-Token"]  # confirm succeeded, so this is the live token
+    clock["now"] += timedelta(seconds=5)
+    again = client.post(ENROLL, headers=bearer(token))
+    assert again.status_code == 409 and "X-Refreshed-Token" not in again.headers
+    clock["now"] += timedelta(seconds=5)
+    assert client.get(LISTINGS, headers=bearer(token)).status_code == 200
+
+
+def test_successful_enroll_and_confirm_still_rotate_the_session_token(client, officer, clock):
+    clock["now"] += timedelta(seconds=5)
+    enrolled = _enroll(client, officer)
+    rotated = enrolled.headers["X-Refreshed-Token"]
+    secret = enrolled.json()["secret"]
+    clock["now"] += timedelta(seconds=5)
+    confirmed = _confirm(client, rotated, _code(secret, clock))
+    assert confirmed.status_code == 204
+    latest = confirmed.headers["X-Refreshed-Token"]
+    assert latest != rotated
+    clock["now"] += timedelta(seconds=5)
+    assert client.get(LISTINGS, headers=bearer(rotated)).status_code == 401  # superseded
+    assert client.get(LISTINGS, headers=bearer(latest)).status_code == 200

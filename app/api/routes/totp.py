@@ -1,14 +1,15 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_institution_user
+from app.api.deps.auth import Principal, require_institution_user_unrotated
 from app.db.session import get_db
 from app.models import InstitutionUser, TotpCredential
 from app.services import auth as auth_service
 from app.services import totp
+from app.services.auth import refresh_and_store_institution_token
 from app.services.rate_limit import login_limiter
 
 router = APIRouter(prefix="/auth/institution/totp")
@@ -28,13 +29,19 @@ def _credential(db: Session, user_id) -> TotpCredential | None:
 
 
 @router.post("/enroll", response_model=TotpEnrollment)
-def enroll(principal: Principal = Depends(require_institution_user), db: Session = Depends(get_db)):
-    """Start (or restart, until confirmed) enrolment. The secret is returned once, here, and never again."""
+def enroll(
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
+    db: Session = Depends(get_db),
+):
+    """Start (or restart, until confirmed) enrolment. The secret is returned once, here, and never again.
+    The session token rotates only on success (a 409 cannot carry X-Refreshed-Token),
+    as in regenerate_recovery_codes."""
     credential = _credential(db, principal.user_id)
     if credential is not None and credential.confirmedAt is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Authenticator already set up")
     officer = db.get(InstitutionUser, principal.user_id)
-    assert officer is not None  # require_institution_user just loaded this row
+    assert officer is not None  # the auth dependency just loaded this row
     secret = totp.new_secret()
     if credential is None:
         credential = TotpCredential(institutionUserId=principal.user_id, secretEncrypted=totp.encrypt_secret(secret))
@@ -42,13 +49,18 @@ def enroll(principal: Principal = Depends(require_institution_user), db: Session
     else:
         credential.secretEncrypted = totp.encrypt_secret(secret)
     db.commit()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
     return TotpEnrollment(secret=secret, otpauthUri=totp.provisioning_uri(secret, officer.email))
 
 
 @router.post("/confirm", status_code=status.HTTP_204_NO_CONTENT)
 def confirm(
-    payload: TotpConfirm, principal: Principal = Depends(require_institution_user), db: Session = Depends(get_db)
+    payload: TotpConfirm,
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
+    db: Session = Depends(get_db),
 ):
+    """Rotate the session token only after the code is accepted: 400/409/429 cannot carry X-Refreshed-Token."""
     key = f"totp:{principal.user_id}"
     wait = login_limiter.retry_after(db, key)
     if wait > 0:
@@ -72,4 +84,7 @@ def confirm(
     credential.confirmedAt = datetime.now(UTC)
     credential.lastUsedStep = step
     db.commit()
+    officer = db.get(InstitutionUser, principal.user_id)
+    assert officer is not None  # the auth dependency just loaded this row
+    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
     return None
