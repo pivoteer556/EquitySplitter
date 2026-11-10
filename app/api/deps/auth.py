@@ -38,7 +38,18 @@ def require_user(
     return _user_principal(response, db, claims)
 
 
-def _user_principal(response: Response, db: Session, claims: dict) -> Principal:
+def require_user_unrotated(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Like require_user but leaves the stored session token alone. For endpoints that can reject the caller AFTER
+    authentication (404/409/422): those responses cannot carry X-Refreshed-Token, so rotating first would strand the
+    caller with a dead token. Such an endpoint rotates itself, after success, with refresh_and_store_user_token."""
+    claims = decode_token(db, _extract_bearer(authorization))
+    return _user_principal(None, db, claims)
+
+
+def _user_principal(response: Response | None, db: Session, claims: dict) -> Principal:
     if claims.get("userType") != "user":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
 
@@ -48,8 +59,8 @@ def _user_principal(response: Response, db: Session, claims: dict) -> Principal:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     validate_active_token_iat(user.lastTokenIssuedAt, claims.get("iat"))
-    refreshed = refresh_and_store_user_token(db, user)
-    response.headers["X-Refreshed-Token"] = refreshed
+    if response is not None:
+        response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
     return Principal(user_id=user.id, user_type="user")
 
 

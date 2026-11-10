@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_user, require_user_or_institution_user
+from app.api.deps.auth import Principal, require_user_or_institution_user, require_user_unrotated
 from app.db.session import get_db
 from app.models import ConnectionRequest, InstitutionUser, Property, User, UserProperty
 from app.schemas.connection_request import (
@@ -11,6 +11,7 @@ from app.schemas.connection_request import (
     IncomingConnectionRequestRead,
 )
 from app.schemas.institution import PROFESSIONAL_ROLES
+from app.services.auth import refresh_and_store_user_token
 
 router = APIRouter()
 
@@ -41,7 +42,8 @@ def _check_targets(db: Session, buyer_id, payload: ConnectionRequestCreate) -> N
 @router.post("/connection-requests", response_model=ConnectionRequestRead, status_code=status.HTTP_201_CREATED)
 def create_connection_request(
     payload: ConnectionRequestCreate,
-    principal: Principal = Depends(require_user),
+    response: Response,
+    principal: Principal = Depends(require_user_unrotated),
     db: Session = Depends(get_db),
 ):
     _check_targets(db, principal.user_id, payload)
@@ -53,6 +55,10 @@ def create_connection_request(
         db.rollback()
         raise HTTPException(status_code=409, detail="Connection already requested") from None
     db.refresh(request)
+    # Rotate only now: a rejection above (404/409/422) cannot carry X-Refreshed-Token, so rotating earlier would
+    # strand the buyer with a dead token.
+    user = db.query(User).filter(User.id == principal.user_id).one()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
     return request
 
 
