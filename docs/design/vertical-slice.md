@@ -333,8 +333,8 @@ Cut line if time is short: ship 1, 2, 3, 4, 5, 6 (the slice is visible and demoa
 
 Risks and unknowns (honest):
 - Allowed values for `valuationMethod` and `partialClaimMethod` not verified; check the agreement schema first.
-- Live DB state: whether migrations 0001-0012 are applied on Azure is unverified; the user runs `alembic upgrade` (and
-  the seed) and must be asked before anything touching Azure.
+- Live DB state: whether migrations 0001-0012 are applied on Azure is unverified; ~~the user runs `alembic upgrade` (and
+  the seed) and must be asked before anything touching Azure.~~ CORRECTED 2026-11-12: migrations are applied automatically at container start by the deploy (`alembic upgrade head` in `scripts/entrypoint.sh`), so 0001-0012 were applied by earlier deploys (unverified directly) and 0013 is applied by the deploy of a89b5f9. Only the SEED (it writes rows into the live DB) is run by the user, who must give his go first.
 - The seed writes rows by hand rather than through routes; drift risk, mitigated by the seed-then-API test.
 - Editing the .docx spec amendment is fiddly (the repo mandates it); budget it, do not skip it.
 - E2E for the home page needs the seed in `global-setup.ts`; unverified that the setup can import the Python script
