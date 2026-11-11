@@ -228,3 +228,35 @@ describe('ApiService base URL', () => {
     expect(productionEnvironment.apiBaseUrl).not.toContain('127.0.0.1');
   });
 });
+
+describe('ApiService buyer property reads', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  function setup() {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(ApiService);
+    api.setUserToken('buyer-jwt');
+    return { api, http: TestBed.inject(HttpTestingController) };
+  }
+
+  it('getProperties GETs /properties with the user token', () => {
+    const { api, http } = setup();
+    api.getProperties().subscribe();
+    const req = http.expectOne(`${environment.apiBaseUrl}/properties`);
+    expect(req.request.headers.get('Authorization')).toBe('Bearer buyer-jwt');
+    req.flush([]);
+  });
+
+  it('getProperty and getOwners use the user token and store its refreshed token when asked for user', () => {
+    const { api, http } = setup();
+    api.getProperty('p-1', 'user').subscribe();
+    const detail = http.expectOne(`${environment.apiBaseUrl}/properties/p-1`);
+    expect(detail.request.headers.get('Authorization')).toBe('Bearer buyer-jwt');
+    detail.flush({}, { headers: { 'X-Refreshed-Token': 'fresh-1' } });
+    api.getOwners('p-1', 'user').subscribe();
+    const owners = http.expectOne(`${environment.apiBaseUrl}/properties/p-1/owners`);
+    expect(owners.request.headers.get('Authorization')).toBe('Bearer fresh-1');
+    owners.flush({ owners: [] });
+  });
+});

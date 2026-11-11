@@ -17,9 +17,10 @@ export interface Property {
   id: string;
   institutionId: string;
   address: string;
-  loanAmount: number;
-  currentBalance: number;
-  monthlyPayment: number;
+  // The API sends money as decimal strings ("485000.00"); only the create payload takes numbers.
+  loanAmount: string;
+  currentBalance: string;
+  monthlyPayment: string;
   dynamicBillingEnabled: boolean;
   status: string;
   createdAt: string;
@@ -49,15 +50,41 @@ export interface PropertyOwnerStatus {
   email: string;
   maxOwnershipPercent: number | null;
   signedAt: string | null;
+  /** Null = not set; the two share fields are null unless every owner on the property has a down payment. */
+  downPaymentAmount: string | null;
+  sharePercent: string | null;
+  estimatedMonthlyShare: string | null;
 }
 
 export interface PropertyOwnersResponse {
   owners: PropertyOwnerStatus[];
 }
 
+/** Always an object; with no purchase row the stage is 'listed' and the rest is null. */
+export interface PropertyPurchase {
+  stage: string;
+  purchasePrice: string | null;
+  closingDate: string | null;
+  applicationFiledAt: string | null;
+  intentToProceedAt: string | null;
+  closedAt: string | null;
+  interestRatePercent: string | null;
+  termMonths: number | null;
+}
+
+export interface PropertyListingSummary {
+  askingPrice: string;
+  bedrooms: number | null;
+  bathrooms: string | null;
+  squareFeet: number | null;
+  description: string | null;
+}
+
 export interface PropertyDetailResponse {
   property: Property;
   agreement: PropertyAgreement | null;
+  purchase: PropertyPurchase;
+  listing: PropertyListingSummary | null;
 }
 
 export interface AuthTokenResponse {

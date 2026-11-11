@@ -1,0 +1,123 @@
+<main class="home">
+  @if (error) {
+    <p role="alert" class="error">{{ error }}</p>
+  }
+
+  @if (loading) {
+    <p>Loading...</p>
+  }
+
+  @if (!loading && !error && !properties.length) {
+    <p>You have no property yet. You can <a routerLink="/listings">browse the listings</a>.</p>
+  }
+
+  @if (properties.length > 1) {
+    <nav aria-label="Your properties">
+      @for (p of properties; track p.id) {
+        <button type="button" (click)="choose(p)" [attr.aria-pressed]="detail?.property?.id === p.id">{{ p.address }}</button>
+      }
+    </nav>
+  }
+
+  @if (detail; as d) {
+    <section class="house" aria-labelledby="home-address">
+      <app-house-illustration maxWidth="420px" />
+      <h1 id="home-address">{{ d.property.address }}</h1>
+      @if (d.listing; as l) {
+        <p>
+          @if (l.bedrooms !== null) { <span>{{ l.bedrooms }} {{ l.bedrooms === 1 ? 'bedroom' : 'bedrooms' }}</span> }
+          @if (l.bathrooms !== null) { <span>{{ l.bathrooms }} {{ l.bathrooms === '1' || l.bathrooms === '1.0' ? 'bathroom' : 'bathrooms' }}</span> }
+          @if (l.squareFeet !== null) { <span>{{ l.squareFeet | number }} sq ft</span> }
+        </p>
+        @if (l.description) {
+          <p>{{ l.description }}</p>
+        }
+      }
+      <p>Stage: <strong>{{ d.purchase.stage }}</strong></p>
+    </section>
+
+    <section aria-labelledby="home-owners">
+      <h2 id="home-owners">Owners</h2>
+      <table class="owners">
+        <caption>Owners of this home, their down payments and shares</caption>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Down payment</th>
+            <th scope="col">Share</th>
+            <th scope="col">Estimated monthly share</th>
+            <th scope="col">Agreement</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (o of owners; track o.userPropertyId) {
+            <tr>
+              <th scope="row">{{ o.name }}</th>
+              <td>{{ o.downPaymentAmount !== null ? (o.downPaymentAmount | currency) : 'Not set' }}</td>
+              <td>{{ o.sharePercent !== null ? o.sharePercent + '%' : 'Not set' }}</td>
+              <td>{{ o.estimatedMonthlyShare !== null ? (o.estimatedMonthlyShare | currency) : 'Not set' }}</td>
+              <td>{{ o.signedAt ? 'Signed' : 'Not yet signed' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="home-terms">
+      <h2 id="home-terms">Purchase terms</h2>
+      <table class="terms">
+        <caption>Purchase and loan terms</caption>
+        <tbody>
+          <tr>
+            <th scope="row">Purchase price</th>
+            <td>{{ d.purchase.purchasePrice !== null ? (d.purchase.purchasePrice | currency) : 'Not set' }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Total down payments</th>
+            <td>{{ totalDownPayments !== null ? (totalDownPayments | currency) : 'Not set' }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Loan amount</th>
+            <td>{{ d.property.loanAmount | currency }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Interest rate</th>
+            <td>{{ d.purchase.interestRatePercent !== null ? d.purchase.interestRatePercent + '%' : 'Not set' }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Loan term</th>
+            <td>{{ d.purchase.termMonths !== null ? d.purchase.termMonths + ' months' : 'Not set' }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Monthly payment</th>
+            <td>{{ d.property.monthlyPayment | currency }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Closing date</th>
+            <td>{{ d.purchase.closingDate ? (d.purchase.closingDate | date: 'mediumDate') : 'Not set' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="home-agreement">
+      <h2 id="home-agreement">Your agreement</h2>
+      @if (d.agreement; as a) {
+        <ul>
+          <li>Notice before a change: {{ a.noticeDays }} days</li>
+          <li>Home value is set by: {{ plain(a.valuationMethod) }}</li>
+          <li>A partial claim is worked out by: {{ plain(a.partialClaimMethod) }}</li>
+          <li>
+            @if (a.effectiveAt) {
+              In effect since {{ a.effectiveAt | date: 'mediumDate' }}
+            } @else {
+              Not yet effective
+            }
+          </li>
+        </ul>
+      } @else {
+        <p>No agreement has been attached yet.</p>
+      }
+    </section>
+  }
+</main>

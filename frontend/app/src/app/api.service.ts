@@ -215,22 +215,30 @@ export class ApiService {
       .pipe(map((res) => this.applyRefreshedToken(res, 'user')));
   }
 
-  getProperty(propertyId: string): Observable<PropertyDetailResponse> {
+  /** Properties the signed-in buyer is linked to (an officer would get their institution's). */
+  getProperties(): Observable<Property[]> {
+    return this.http
+      .get<Property[]>(`${this.baseUrl}/properties`, { observe: 'response', headers: this.userHeaders() })
+      .pipe(map((res) => this.applyRefreshedToken(res, 'user')));
+  }
+
+  /** `as` picks whose token signs the call: the officer's by default, the buyer's for the owner pages. */
+  getProperty(propertyId: string, as: 'institution' | 'user' = 'institution'): Observable<PropertyDetailResponse> {
     return this.http
       .get<PropertyDetailResponse>(`${this.baseUrl}/properties/${propertyId}`, {
         observe: 'response',
-        headers: this.institutionHeaders(),
+        headers: this.headersFor(as),
       })
-      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+      .pipe(map((res) => this.applyRefreshedToken(res, as)));
   }
 
-  getOwners(propertyId: string): Observable<PropertyOwnersResponse> {
+  getOwners(propertyId: string, as: 'institution' | 'user' = 'institution'): Observable<PropertyOwnersResponse> {
     return this.http
       .get<PropertyOwnersResponse>(`${this.baseUrl}/properties/${propertyId}/owners`, {
         observe: 'response',
-        headers: this.institutionHeaders(),
+        headers: this.headersFor(as),
       })
-      .pipe(map((res) => this.applyRefreshedToken(res, 'institution')));
+      .pipe(map((res) => this.applyRefreshedToken(res, as)));
   }
 
   /** Marketplace view; any signed-in buyer or officer may read it, so send whichever token is present. */
@@ -240,6 +248,10 @@ export class ApiService {
       params: new HttpParams().set('limit', limit).set('offset', offset),
       headers: new HttpHeaders({ Authorization: `Bearer ${token}` }),
     });
+  }
+
+  private headersFor(as: 'institution' | 'user'): HttpHeaders {
+    return as === 'user' ? this.userHeaders() : this.institutionHeaders();
   }
 
   private institutionHeaders(): HttpHeaders {
