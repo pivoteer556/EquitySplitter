@@ -8,7 +8,6 @@ from app.api.deps.auth import (
     Principal,
     require_institution_user,
     require_institution_user_unrotated,
-    require_user_or_institution_user,
     require_user_or_institution_user_unrotated,
     require_user_property_scope,
     require_user_unrotated,
@@ -96,11 +95,12 @@ def create_institution_user(
 
 
 @router.get("/professionals", response_model=list[ProfessionalRead])
-def list_professionals(
+def list_professionals(  # noqa: PLR0913 - role, paging, response, principal and db are all needed
+    response: Response,
     role: ProfessionalRole | None = None,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    _principal: Principal = Depends(require_user_or_institution_user),
+    principal: Principal = Depends(require_user_or_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     inst_name = Institution.name.label("institutionName")
@@ -111,6 +111,8 @@ def list_professionals(
         .filter(InstitutionUser.role.in_([role] if role else PROFESSIONAL_ROLES))
     )
     rows = query.order_by(InstitutionUser.name, InstitutionUser.id).limit(limit).offset(offset).all()
+    # Rotate on the success path only: a 422 cannot carry X-Refreshed-Token.
+    rotate_session(db, principal, response)
     return [ProfessionalRead(**row._asdict()) for row in rows]
 
 
@@ -324,13 +326,16 @@ def list_properties(
     response: Response,
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    principal: Principal = Depends(require_user_or_institution_user),
+    principal: Principal = Depends(require_user_or_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     query = _visible_properties(db, principal).order_by(Property.createdAt.desc(), Property.id)
     # selectinload: one extra query for all loans on the page instead of one lazy load per property.
     rows = query.options(selectinload(Property.loan)).limit(limit).offset(offset).all()
-    return [_property_read(p) for p in rows]
+    result = [_property_read(p) for p in rows]  # before the rotation commit expires the rows (and re-queries loans)
+    # Rotate on the success path only: a 422 cannot carry X-Refreshed-Token.
+    rotate_session(db, principal, response)
+    return result
 
 
 def _pending_listings(db: Session):
@@ -340,12 +345,17 @@ def _pending_listings(db: Session):
 
 @router.get("/listings", response_model=list[ListingRead])
 def list_listings(
+    response: Response,
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    _principal: Principal = Depends(require_user_or_institution_user),
+    principal: Principal = Depends(require_user_or_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
-    return _pending_listings(db).order_by(Property.createdAt.desc(), Property.id).limit(limit).offset(offset).all()
+    rows = _pending_listings(db).order_by(Property.createdAt.desc(), Property.id).limit(limit).offset(offset).all()
+    result = [ListingRead.model_validate(p) for p in rows]  # before the rotation commit expires the rows
+    # Rotate on the success path only: a 422 cannot carry X-Refreshed-Token.
+    rotate_session(db, principal, response)
+    return result
 
 
 def _readable_property(db: Session, principal: Principal, property_id: str) -> Property:
