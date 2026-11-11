@@ -25,3 +25,6 @@ __pycache__/
 *.tfstate
 *.tfstate.*
 *.tfvars
+
+# Power BI data source files (they name the database server)
+*.pbids
