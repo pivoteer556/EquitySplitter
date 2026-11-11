@@ -58,7 +58,7 @@ router = APIRouter()
 def create_institution(
     payload: InstitutionCreate,
     response: Response,
-    principal: Principal = Depends(require_institution_user),
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     if principal.institution_id is None:
@@ -67,6 +67,9 @@ def create_institution(
     db.add(institution)
     db.commit()
     db.refresh(institution)
+    # Rotate on the success path only: a 403/422 cannot carry X-Refreshed-Token, so rotating earlier would strand the
+    # officer with a dead token.
+    rotate_session(db, principal, response)
     return institution
 
 
@@ -74,7 +77,7 @@ def create_institution(
 def create_institution_user(
     payload: InstitutionUserCreate,
     response: Response,
-    principal: Principal = Depends(require_institution_user),
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     if principal.institution_id != payload.institutionId:
@@ -84,6 +87,9 @@ def create_institution_user(
     db.commit()
     db.refresh(inst_user)
     token = issue_institution_invite_token(db, inst_user.id)
+    # Rotate on the success path only: a 403/422 cannot carry X-Refreshed-Token, so rotating earlier would strand the
+    # officer with a dead token.
+    rotate_session(db, principal, response)
     read = InstitutionUserRead.model_validate(inst_user)
     return InstitutionUserCreated(**read.model_dump(), activationToken=token, activationPath=f"/activate#token={token}")
 
