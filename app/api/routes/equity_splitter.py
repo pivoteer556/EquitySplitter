@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +21,7 @@ from app.models import (
     OwnerAcknowledgement,
     Property,
     PropertyAgreement,
+    PropertyListing,
     User,
     UserProperty,
 )
@@ -43,6 +45,7 @@ from app.schemas.owner_acknowledgement import (
 from app.schemas.professional import ProfessionalRead
 from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
+from app.schemas.purchase import ListingSummaryRead, PurchaseRead
 from app.schemas.user_property import OwnerInviteCreate
 from app.services.auth import (
     EMAIL_TAKEN,
@@ -51,6 +54,7 @@ from app.services.auth import (
     issue_invite_token,
     unusable_password_hash,
 )
+from app.services.purchase import owner_shares, purchase_stage
 
 router = APIRouter(route_class=RotatingRoute)
 
@@ -325,10 +329,31 @@ def get_property(
     prop = load_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
+    listing = (
+        db.query(PropertyListing)
+        .filter(PropertyListing.propertyId == prop.id, PropertyListing.status == "listed")
+        .first()
+    )
     return {
         "property": _property_read(prop).model_dump(),
         "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else None,
+        "purchase": _purchase_read(prop),
+        "listing": ListingSummaryRead.model_validate(listing, from_attributes=True) if listing else None,
     }
+
+
+def _purchase_read(prop: Property) -> PurchaseRead:
+    purchase, loan = prop.purchase, prop.loan
+    terms = {
+        f: getattr(purchase, f, None)
+        for f in ("purchasePrice", "closingDate", "applicationFiledAt", "intentToProceedAt", "closedAt")
+    }
+    return PurchaseRead(
+        stage=purchase_stage(purchase),
+        interestRatePercent=loan.interestRatePercent if loan else None,
+        termMonths=loan.termMonths if loan else None,
+        **terms,
+    )
 
 
 @router.patch("/properties/{propertyId}", response_model=PropertyRead)
@@ -396,6 +421,8 @@ def list_owners(
         .all()
     )
 
+    loan_source = prop.loan if prop.loan is not None else prop
+    shares = owner_shares([up.downPaymentAmount for up, _u, _a in rows], Decimal(loan_source.monthlyPayment))
     owners = [
         PropertyOwnerStatus(
             userPropertyId=up.id,
@@ -404,7 +431,10 @@ def list_owners(
             email=u.email,
             maxOwnershipPercent=float(up.maxOwnershipPercent) if up.maxOwnershipPercent is not None else None,
             signedAt=ack.signedAt if ack else None,
+            downPaymentAmount=up.downPaymentAmount,
+            sharePercent=shares[i].percent if shares else None,
+            estimatedMonthlyShare=shares[i].monthly if shares else None,
         )
-        for up, u, ack in rows
+        for i, (up, u, ack) in enumerate(rows)
     ]
     return {"owners": owners}

@@ -63,7 +63,7 @@ def test_officer_detail_reads_loan_row(client, officer, session_factory):
     prop = _property(client, officer)
     _diverge_loan(session_factory, prop["id"])
     body, _ = _get(client, officer["accessToken"], f"{API}/properties/{prop['id']}")
-    assert set(body) == {"property", "agreement"}
+    assert set(body) == {"property", "agreement", "purchase", "listing"}  # purchase and listing: additive, S2
     _as_loan(body["property"])
 
 

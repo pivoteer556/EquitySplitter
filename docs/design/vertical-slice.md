@@ -309,6 +309,10 @@ Money is serialized as strings or numbers consistent with the existing `Decimal`
 whatever the existing frontend `Property` type does (I did not check how `models.ts` types money; it is a one-line
 decision for whoever builds it).
 
+DEVIATION (2026-11-12, as built): S2 built `purchase` as always-an-object, with stage `listed` and every other field null
+when there is no purchase row, where this section made it nullable. S4 gave the `app-house-illustration` `label` input a
+default (`Illustration of a suburban house`) where the design had it empty. Both are recorded in `docs/specs/README.md`.
+
 ## 6. Slice plan
 
 Standard: minimum verifiable change = one observable behavior, test first, one commit; docs and BACKLOG.md in the same
