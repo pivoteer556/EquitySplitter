@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -19,6 +20,7 @@ class UserProperty(Base):
         "propertyId", UUID(as_uuid=True), ForeignKey("properties.id", ondelete="CASCADE"), nullable=False
     )
     maxOwnershipPercent: Mapped[float | None] = mapped_column("maxOwnershipPercent", Numeric(5, 2), nullable=True)
+    downPaymentAmount: Mapped[Decimal | None] = mapped_column("downPaymentAmount", Numeric(12, 2), nullable=True)
     createdAt: Mapped[DateTime] = mapped_column(
         "createdAt", DateTime(timezone=True), nullable=False, server_default=func.now()
     )

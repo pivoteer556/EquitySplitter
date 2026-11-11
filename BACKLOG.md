@@ -2,7 +2,7 @@
 
 ## Current focus (user decision 2026-11-12): the vertical slice
 
-**Resume notes (for the next session; written 2026-11-12, the session limit is near).** Where things stand: CI is green through 67d125a; the slice design is committed as 97568d6 (`docs/design/vertical-slice.md`, the design of record); NO slice code is built (S1 to S10 below are all NOT BUILT). The next step is the user's go on the five "Remaining questions" defaults below (or corrections), then S1. Standing workflow rules, one line each:
+**Resume notes (for the next session; written 2026-11-12, the session limit is near).** Where things stand: CI is green through 67d125a; the slice design is committed as 97568d6 (`docs/design/vertical-slice.md`, the design of record); UPDATE 2026-11-12: the user accepted all five "Remaining questions" defaults, and S1 is BUILT (hash: TBD; schema only, migration 0013, models, `purchase_stage()` and `owner_shares()`; nothing writes or displays it); S2 to S10 are still NOT BUILT. The next step is S2 (the API read). What the user must do: run migration 0013 on Azure (`alembic upgrade head`) only when we get to the seed or the home page and he says so; we ask first, and no running code reads the new columns before then. Original note: NO slice code was built (S1 to S10 all NOT BUILT) pending the user's go on the five defaults. Standing workflow rules, one line each:
 
 - MAGI agents edit code; the orchestrator verifies and commits (rotation pointer in `.claude/magi/rotation.md`).
 - Minimum verifiable change: one observable behavior per commit.
@@ -50,25 +50,25 @@ Gaps the slice would need to close (verified in `docs/design/vertical-slice.md` 
 ### Decisions (user, 2026-11-12)
 
 - (a) Demo sign-in: DECIDED 2026-11-12, the default ("more secure"). An operator-run seed script prints one-time password-setup links, reusing the existing invite-link generator; nobody chooses a password for anyone, so principle 2c-1 holds with no exception. Not built.
-- (b) Purchase terms: DECIDED 2026-11-12 in principle (the slice models them). The user's words: "The db should already be set up for this. It was v1." Checked against the schema by Balthazar (design section 1): partly right. Ownership percent (derived from the ledger) and per-owner dues (`PaymentCycle`) are in v1 as structures but nothing writes them; purchase price, per-owner down payment, interest rate, loan term and closing date are not in v1. The design proposes one additive migration (0013) for those. Not built.
+- (b) Purchase terms: DECIDED 2026-11-12 in principle (the slice models them). The user's words: "The db should already be set up for this. It was v1." Checked against the schema by Balthazar (design section 1): partly right. Ownership percent (derived from the ledger) and per-owner dues (`PaymentCycle`) are in v1 as structures but nothing writes them; purchase price, per-owner down payment, interest rate, loan term and closing date are not in v1. The design proposes one additive migration (0013) for those. Schema built 2026-11-12 (S1: migration 0013, not applied on Azure); nothing writes or displays it yet.
 - (c) Process: DECIDED 2026-11-12. Show the house DURING the purchase: once the loan application is filed and there is an Intent to Proceed (ITP), start displaying the property as "belonging to" those buyers, in a data sense, not a property or title sense. Not built.
 - (d) Imagery: DECIDED 2026-11-12. An SVG illustration of a suburban house, used when a property has no photo. Photos and blob storage (2h step 5) stay deferred. Not built.
 
 ### Remaining questions (with defaults): AWAITING THE USER
 
-Balthazar's design (section 7) leaves five questions. Each is OPEN with his default. NOTHING in the slice is built until the user confirms or accepts these defaults.
+Balthazar's design (section 7) left five questions, each with his default. The user ACCEPTED all five defaults on 2026-11-12 (heading kept for history; nothing is awaited now).
 
-1. OPEN: store each owner's down payment as a column (`userProperties.downPaymentAmount`) or in the equity ledger? Default: the column (the ledger needs a `PaymentCycle` per row and the spec forbids cycles before activation; the ledger takes over at closing).
-2. OPEN: who sees the "belongs to" display? Default: the owners themselves and officers of the institution only; the public `/listings` card shows no names (at most "Under contract").
-3. OPEN: is the `closed` stage display-only? Default: yes; the seed never sets `closedAt`.
-4. OPEN: `/owners` already shows every co-owner's email to each linked buyer. Default: leave it for this slice (names only on the new page, still sourced from `/owners`) and queue a restriction as a separate change.
-5. OPEN: do owners land on `/home` instead of `/listings` after sign-in? Default: yes, with `/listings` one click away.
+1. DECIDED 2026-11-12: user accepted the default. Store each owner's down payment as a column (`userProperties.downPaymentAmount`), not in the equity ledger (the ledger needs a `PaymentCycle` per row and the spec forbids cycles before activation; the ledger takes over at closing). Built in S1.
+2. DECIDED 2026-11-12: user accepted the default. The "belongs to" display is shown to the owners themselves and officers of the institution only; the public `/listings` card shows no names (at most "Under contract").
+3. DECIDED 2026-11-12: user accepted the default. The `closed` stage is display-only for the slice; the seed never sets `closedAt`.
+4. DECIDED 2026-11-12: user accepted the default. `/owners` keeps showing every co-owner's email to each linked buyer for this slice (names only on the new page, still sourced from `/owners`); a restriction is queued as a separate change.
+5. DECIDED 2026-11-12: user accepted the default. Owners land on `/home` instead of `/listings` after sign-in, with `/listings` one click away.
 
 ### Slice plan (from the design, section 6; all NOT BUILT)
 
 The first demoable core is S1 to S6. Each item is one observable behavior, test first, one commit, with docs and this file updated in the same commit. Order is the design's; sizes and test details are in the design.
 
-- S1. NOT BUILT. Migration 0013 plus models plus `purchase_stage()`: a purchase row, loan rate and term, and `downPaymentAmount` persist; the stage derivation holds; CHECK constraints reject an ITP without an application.
+- ~~S1. NOT BUILT. Migration 0013 plus models plus `purchase_stage()`: a purchase row, loan rate and term, and `downPaymentAmount` persist; the stage derivation holds; CHECK constraints reject an ITP without an application.~~ **Done** 2026-11-12 (hash: TBD). Migration `0013_purchase_terms` (additive; downgrade drops the table and three columns): table `propertyPurchases` (one per property, `purchasePrice` > 0, `closingDate`, three stage timestamps, CHECKs: ITP needs application, closed needs ITP), nullable `loans.interestRatePercent` and `loans.termMonths`, nullable `userProperties.downPaymentAmount`; `app/services/purchase.py` with `PurchaseStage`, pure `purchase_stage()` and pure `owner_shares()` (stage and share percent derived, never stored; shares sum exactly to the monthly payment). Counts: pytest 568 (28 new tests), ruff and mypy (59 files) clean; migration run up, down, up on a throwaway local PostgreSQL with each CHECK and the UNIQUE seen rejecting a bad row. NOT verified: the live Azure database (0013 not applied there; the user runs it, ask first). Nothing writes a purchase row yet (S3), no API or response model changed (S2), no UI, nothing displayed.
 - S2. NOT BUILT. `GET /properties/{id}` returns `purchase` and `listing`; `/owners` returns down payment, share and estimated monthly share; an unlinked buyer gets 403, a missing property 404.
 - S3. NOT BUILT. `scripts/seed_demo.py`: seeds the house and three buyers and prints three one-time links with no password set; a re-run is idempotent and re-issues links only for unset accounts; a link sets a password, sign-in works, and the buyer can GET their property.
 - S4. NOT BUILT. `app-house-illustration` component (inline SVG, used when a property has no photo); can run in parallel with S1 to S3.

@@ -41,3 +41,27 @@ def test_offline_render_creates_recovery_codes_with_hash_and_cascade(capsys):
     sql = capsys.readouterr().out
     assert 'CREATE TABLE "recoveryCodes"' in sql and '"codeHash"' in sql and '"usedAt"' in sql
     assert "ON DELETE CASCADE" in sql
+
+
+def test_offline_render_creates_purchases_with_stage_checks_and_adds_term_columns(capsys):
+    command.upgrade(Config("alembic.ini"), "0012_recovery_codes:0013_purchase_terms", sql=True)
+    sql = capsys.readouterr().out
+    assert 'CREATE TABLE "propertyPurchases"' in sql and "ON DELETE CASCADE" in sql
+    assert '"intentToProceedAt" IS NULL OR "applicationFiledAt" IS NOT NULL' in sql
+    assert '"closedAt" IS NULL OR "intentToProceedAt" IS NOT NULL' in sql
+    assert 'ADD COLUMN "interestRatePercent"' in sql and 'ADD COLUMN "termMonths"' in sql
+    assert 'ADD COLUMN "downPaymentAmount"' in sql
+
+
+def test_offline_render_downgrade_drops_purchases_and_term_columns(capsys):
+    command.downgrade(Config("alembic.ini"), "0013_purchase_terms:0012_recovery_codes", sql=True)
+    sql = capsys.readouterr().out
+    assert 'DROP TABLE "propertyPurchases"' in sql
+    assert 'DROP COLUMN "interestRatePercent"' in sql and 'DROP COLUMN "termMonths"' in sql
+    assert 'DROP COLUMN "downPaymentAmount"' in sql
+
+
+def test_alembic_has_one_head_and_it_is_the_purchase_terms_migration():
+    from alembic.script import ScriptDirectory
+
+    assert ScriptDirectory.from_config(Config("alembic.ini")).get_heads() == ["0013_purchase_terms"]

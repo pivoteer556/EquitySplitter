@@ -11,6 +11,7 @@ from app.models.payment_cycle import PaymentCycle
 from app.models.property import Property
 from app.models.property_agreement import PropertyAgreement
 from app.models.property_listing import PropertyListing
+from app.models.property_purchase import PropertyPurchase
 from app.models.rate_limit_hit import RateLimitHit
 from app.models.recovery_code import RecoveryCode
 from app.models.token_revocation import TokenRevocation
@@ -26,6 +27,7 @@ __all__ = [
     "Property",
     "PropertyAgreement",
     "PropertyListing",
+    "PropertyPurchase",
     "Loan",
     "ConnectionRequest",
     "UserProperty",

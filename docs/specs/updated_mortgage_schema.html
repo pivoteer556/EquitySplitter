@@ -8,8 +8,12 @@
      0009 propertyListings (marketing data, many per property, at most one 'listed' via a partial unique index; 2026-11-08);
      0010 totpCredentials (authenticator-app secret per institution user, encrypted; 2026-11-08);
      0011 users.isPlatformAdmin (boolean NOT NULL default false; platform admin = a users row with no institution; 2026-11-09);
-     0012 recoveryCodes (one-time officer recovery codes, keyed hash only, usedAt when spent; 2026-11-09). -->
+     0012 recoveryCodes (one-time officer recovery codes, keyed hash only, usedAt when spent; 2026-11-09);
+     0013 propertyPurchases (one purchase row per property: price, closing date, stage timestamps), loans.interestRatePercent and
+     loans.termMonths, userProperties.downPaymentAmount (all additive and nullable except the purchase row's price; ADDED 2026-11-12, vertical slice S1;
+     BUILT in the models and the migration only: nothing writes these tables or columns yet and no API returns them; not applied to the live Azure database). -->
 <p style="font-size:13px;margin:0 0 8px">Current schema, synced with migrations 0001-0012 on 2026-11-09 (0012 adds RECOVERY_CODE, hashed one-time officer recovery codes; 0011 adds USER.isPlatformAdmin, the platform admin account kind that gates institution bootstrap; no institution link). The loan columns on PROPERTY are transitional: the API reads LOAN, and PROPERTY keeps and dual-writes them until a later migration drops them. Table names in the database are camelCase plurals (for example userProperties); names here follow the spec documents.</p>
+<p style="font-size:13px;margin:0 0 8px">Added 2026-11-12 (vertical slice S1, migration 0013_purchase_terms, down revision 0012_recovery_codes): the table PROPERTY_PURCHASE and three nullable columns, LOAN.interestRatePercent, LOAN.termMonths and USER_PROPERTY.downPaymentAmount. The purchase stage (listed, application_filed, intent_to_proceed, closed) is derived from the three timestamps in code, never stored. Status: built in the models and the migration, nothing writes these rows or columns yet and no API returns them; the migration has not been applied to the live Azure database.</p>
 
 <div id="erd"></div>
 <style>
@@ -78,6 +82,18 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     decimal currentBalance
     decimal monthlyPayment
     bool dynamicBillingEnabled
+    decimal interestRatePercent "nullable, Numeric(6,3), added 2026-11-12 (S1)"
+    int termMonths "nullable, added 2026-11-12 (S1)"
+    timestamptz createdAt
+  }
+  PROPERTY_PURCHASE {
+    uuid id PK
+    uuid propertyId FK, UK "ON DELETE CASCADE, one per property, added 2026-11-12 (S1)"
+    decimal purchasePrice "NOT NULL, CHECK > 0, Numeric(12,2)"
+    date closingDate "nullable, planned then actual"
+    timestamptz applicationFiledAt "nullable"
+    timestamptz intentToProceedAt "nullable, CHECK needs applicationFiledAt"
+    timestamptz closedAt "nullable, CHECK needs intentToProceedAt"
     timestamptz createdAt
   }
   PROPERTY_LISTING {
@@ -131,6 +147,7 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
     uuid userId FK
     uuid propertyId FK
     decimal maxOwnershipPercent
+    decimal downPaymentAmount "nullable, Numeric(12,2), added 2026-11-12 (S1)"
     timestamptz createdAt
   }
   OWNER_ACKNOWLEDGEMENT {
@@ -204,6 +221,7 @@ const { svg } = await mermaid.render('erd-svg', `erDiagram
   INSTITUTION_USER ||--o| TOTP_CREDENTIAL : "authenticates with"
   INSTITUTION_USER ||--o{ RECOVERY_CODE : "can recover with"
   PROPERTY ||--o| LOAN : "has"
+  PROPERTY ||--o| PROPERTY_PURCHASE : "bought through"
   PROPERTY ||--o{ PROPERTY_LISTING : "marketed as"
   PROPERTY ||--o| PROPERTY_AGREEMENT : "governed by"
   PROPERTY_AGREEMENT ||--o{ OWNER_ACKNOWLEDGEMENT : "signed by"
