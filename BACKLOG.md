@@ -2,6 +2,16 @@
 
 ## Current focus (user decision 2026-11-12): the vertical slice
 
+**Resume notes (for the next session; written 2026-11-12, the session limit is near).** Where things stand: CI is green through 67d125a; the slice design is committed as 97568d6 (`docs/design/vertical-slice.md`, the design of record); NO slice code is built (S1 to S10 below are all NOT BUILT). The next step is the user's go on the five "Remaining questions" defaults below (or corrections), then S1. Standing workflow rules, one line each:
+
+- MAGI agents edit code; the orchestrator verifies and commits (rotation pointer in `.claude/magi/rotation.md`).
+- Minimum verifiable change: one observable behavior per commit.
+- Test first, and see it fail before the fix.
+- Stage explicit paths only; never `git add -A`.
+- The user runs `terraform apply` and any live-database or Azure action (migrations, the seed against Azure); ask first.
+- The untracked `equitysplitter-pg2_equity_splitter.pbids` is the user's and is never committed.
+- Docs (`docs/specs/`) and this file are updated in the same commit as the change; items are struck through, never deleted.
+
 The user's words (verbatim): "I think we need to de-scope some of the loan-origination plans I was making. For now, we need to focus on the following vertical slice. We need a house (we can AI generate some suburban listing), a set of accounts for people who've bought the house, and the various terms of their purchase modeled out and displayed. Then, we'll focus on tracking loans through the pipeline. I got overambitious with that."
 
 The slice has three parts, as the user stated them:
@@ -14,7 +24,7 @@ ORDER: tracking loans through the pipeline comes AFTER the slice, not with it.
 
 DEFERRED because the slice uses synthetic data: the real-listing-data and listing-authority question (the "Listing authority model does not match how selling works" item in Open decisions below, and any idea of ingesting real listings from an MLS or a third-party API). Nothing in that item is built, so deferring it costs nothing; it is annotated there.
 
-PROPOSAL, NOT DECIDED (written 2026-11-12 by Casper from the code; the user has not confirmed any list below).
+The design of record is `docs/design/vertical-slice.md` (commit 97568d6). The four earlier open questions were answered by the user on 2026-11-12 (see "Decisions" below). The KEEP/DEFER/PARK table is still PROPOSED, not confirmed by the user. The "what exists" list below was written 2026-11-12 by Casper from the code.
 
 What already exists that serves the slice (checked in `app/models`, `app/schemas`, `app/api/routes`, `frontend/app/src/app`):
 
@@ -27,29 +37,53 @@ What already exists that serves the slice (checked in `app/models`, `app/schemas
 - One property lookup rule: `load_property` (`app/api/deps/properties.py`): missing or malformed id is 404, forbidden is 403.
 - The demo site: https://equitysplitter.app (custom domain on the Static Web App per `infra/CUSTOM_DOMAIN.md`, and the career page links to it, commit d49c07d). I did not check that it is live.
 
-Gaps the slice would need to close (PROPOSAL, not decided):
+Gaps the slice would need to close (verified in `docs/design/vertical-slice.md` section 1, the terms map; this replaces the earlier list, which was half right):
 
-- No owner-facing "my home" page: an owner has no screen that shows their property and its terms. After accept-invite an owner lands on `/listings`, which shows the buyer listing fields only. `GET /properties/{id}` and `/owners` already return the data to a linked owner (not displayed anywhere for owners).
-- The owner has no screen to acknowledge on (existing item in section 6; `/workbench` is officer-only).
+- Truly MISSING in v1 (no column, no migration): purchase price (only `PropertyListing.askingPrice`, the seller's ask, and `EquityTransfer.askingPrice`, a later share sale); each owner's down payment (the ledger cannot hold one: `EquityLedger.cycleId` is NOT NULL and the spec forbids cycles before activation); interest rate (only `PaymentCycle.interestDue`, a per-cycle dollar amount); loan term; closing date (`PropertyAgreement.effectiveAt` is the last acknowledgement, not a closing); application filed and Intent to Proceed (`ConnectionRequest.status` is a buyer asking a professional, not a loan application).
+- PARTLY MODELED (structure exists, no data and no reader): each owner's ownership percent is deliberately derived from `EquityLedger.runningBalance` (v1 spec decision "Share percent"), and `UserProperty.maxOwnershipPercent` is only a nullable cap; each owner's share of the monthly payment lives in `PaymentCycle` (per owner, with `equityDue`, `interestDue`, and so on). No code writes `EquityLedger`, `PaymentCycle`, `Payment` or `EquityTransfer` rows and there is no endpoint, so none of it is populated or displayed.
+- MODELED already: loan amount, current balance, whole-house monthly payment (`Loan`), the agreement terms (notice days, valuation method, partial-claim method, effective date), owner links and acknowledgements. The user's belief (decision (b) below) that the database "was set up for this in v1" is therefore only partly right: v1 is the post-closing machine (cycles, payments, ledger, transfers) and has no model of the purchase itself.
+- No owner-facing "my home" page: an owner has no screen that shows their property and its terms. After accept-invite an owner lands on `/listings`, which shows id, address, status and date. `GET /properties/{id}` and `/owners` already return data to a linked owner (not displayed anywhere for owners). Buyers have no read route for `PropertyListing` fields (officer-only).
+- The owner has no screen to acknowledge on (existing item in section 6; `/workbench` is officer-only). This is S9 below.
 - No synthetic seed data and no seed script (only `scripts/create_platform_admin.py` exists in `scripts/`).
-- Purchase terms NOT MODELED (each checked against `app/models`): purchase price (only `PropertyListing.askingPrice` exists, which is an asking price, not what was paid); down payment per owner; each owner's actual ownership percent (only `UserProperty.maxOwnershipPercent`, a nullable cap, exists); interest rate; loan term; closing date; the monthly payment split per owner (`Property.monthlyPayment` and `Loan.monthlyPayment` are one number for the whole house; `PaymentCycle` has per-owner dues but no endpoint and nothing creates cycles). Modeled already: loan amount, current balance, monthly payment (whole house), and the agreement terms listed above.
-- No demo accounts story consistent with principle 2c-1 (only the account holder ever knows their password): how a visitor signs in as a co-buyer on the showcase needs a decision (question (a) below). Note that item 2l's decision (everyone uses 2FA, including owners) is not yet built for owners and would also affect a demo sign-in.
+- Owner 2FA is not a blocker for the demo sign-in: user login never challenges (`auth.py:182-201`).
 
-### Open questions for the user before the slice is designed
+### Decisions (user, 2026-11-12)
 
-Each has a recommended default (mine; the user decides).
+- (a) Demo sign-in: DECIDED 2026-11-12, the default ("more secure"). An operator-run seed script prints one-time password-setup links, reusing the existing invite-link generator; nobody chooses a password for anyone, so principle 2c-1 holds with no exception. Not built.
+- (b) Purchase terms: DECIDED 2026-11-12 in principle (the slice models them). The user's words: "The db should already be set up for this. It was v1." Checked against the schema by Balthazar (design section 1): partly right. Ownership percent (derived from the ledger) and per-owner dues (`PaymentCycle`) are in v1 as structures but nothing writes them; purchase price, per-owner down payment, interest rate, loan term and closing date are not in v1. The design proposes one additive migration (0013) for those. Not built.
+- (c) Process: DECIDED 2026-11-12. Show the house DURING the purchase: once the loan application is filed and there is an Intent to Proceed (ITP), start displaying the property as "belonging to" those buyers, in a data sense, not a property or title sense. Not built.
+- (d) Imagery: DECIDED 2026-11-12. An SVG illustration of a suburban house, used when a property has no photo. Photos and blob storage (2h step 5) stay deferred. Not built.
 
-(a) How should the co-buyer demo accounts sign in on the showcase, given principle 2c-1 (no passwords we create)? Options: (1) operator-generated one-time password-setup links printed by a seed script (the same link generator as invites; the operator or the user opens them and chooses a password); (2) a documented demo credential (a deliberate, written exception to 2c-1, with the account limited to demo data); (3) a read-only "view as" mode (a viewer sees an owner's page without signing in as them; needs a new, carefully scoped endpoint). Recommended default: (1), because it needs no exception and no new access path; revisit (3) if visitors must click in without any setup.
+### Remaining questions (with defaults): AWAITING THE USER
 
-(b) Exactly which purchase terms to model? Proposed list: purchase price; each owner's down payment and ownership percent; loan amount, interest rate, term, and the monthly payment split per owner; closing date; and the shared-equity agreement terms already modeled (notice days, valuation method, partial-claim method). What is missing, or too much? Recommended default: model that list, as plain stored values for display only (no calculation of amortization), and leave out anything that needs the equity ledger to run.
+Balthazar's design (section 7) leaves five questions. Each is OPEN with his default. NOTHING in the slice is built until the user confirms or accepts these defaults.
 
-(c) Should the slice show the house after purchase (owners already own it, terms displayed) or also the purchase process (invite, acknowledge, activate)? Recommended default: post-purchase first (seeded owners, terms displayed on a "my home" page), with the existing invite and acknowledge flow as step two.
+1. OPEN: store each owner's down payment as a column (`userProperties.downPaymentAmount`) or in the equity ledger? Default: the column (the ledger needs a `PaymentCycle` per row and the spec forbids cycles before activation; the ledger takes over at closing).
+2. OPEN: who sees the "belongs to" display? Default: the owners themselves and officers of the institution only; the public `/listings` card shows no names (at most "Under contract").
+3. OPEN: is the `closed` stage display-only? Default: yes; the seed never sets `closedAt`.
+4. OPEN: `/owners` already shows every co-owner's email to each linked buyer. Default: leave it for this slice (names only on the new page, still sourced from `/owners`) and queue a restriction as a separate change.
+5. OPEN: do owners land on `/home` instead of `/listings` after sign-in? Default: yes, with `/listings` one click away.
 
-(d) House imagery: text-only listing first, or generated illustration or photos? Note that an AI model like Claude cannot generate photographs. Recommended default: text-only listing first (the schema already has the fields), then a simple SVG illustration, and a generated-image tool later if wanted. Photos would also need blob storage (2h step 5), which stays deferred.
+### Slice plan (from the design, section 6; all NOT BUILT)
+
+The first demoable core is S1 to S6. Each item is one observable behavior, test first, one commit, with docs and this file updated in the same commit. Order is the design's; sizes and test details are in the design.
+
+- S1. NOT BUILT. Migration 0013 plus models plus `purchase_stage()`: a purchase row, loan rate and term, and `downPaymentAmount` persist; the stage derivation holds; CHECK constraints reject an ITP without an application.
+- S2. NOT BUILT. `GET /properties/{id}` returns `purchase` and `listing`; `/owners` returns down payment, share and estimated monthly share; an unlinked buyer gets 403, a missing property 404.
+- S3. NOT BUILT. `scripts/seed_demo.py`: seeds the house and three buyers and prints three one-time links with no password set; a re-run is idempotent and re-issues links only for unset accounts; a link sets a password, sign-in works, and the buyer can GET their property.
+- S4. NOT BUILT. `app-house-illustration` component (inline SVG, used when a property has no photo); can run in parallel with S1 to S3.
+- S5. NOT BUILT. `/home` page for an owner: property card, owners and shares, terms table.
+- S6. NOT BUILT. Stage statement and "belongs to" wording by stage (application filed versus ITP).
+- S7. NOT BUILT. Owners land on `/home` after login and accept-invite (`ownerGuard`).
+- S8. NOT BUILT. The illustration appears on the `/listings` card.
+- S9. NOT BUILT. Owner acknowledge screen (the existing gap): the signed owner sees "signed", and the last signature makes the property `active`.
+- S10. NOT BUILT. Docs sync (spec amendments, schema HTML, README rows); folded into each commit above, not a separate commit.
+
+Cut line if time is short: S1 to S6 ship the slice demoable; S7 to S9 wait.
 
 ### Proposed deferral of loan-origination plans (CONFIRM with the user; not applied)
 
-PROPOSED, AWAITING THE USER'S CONFIRMATION. Nothing below has been changed in the items themselves: the items keep their current text and status until the user confirms or corrects this table. KEEP means the slice or the infrastructure and security already built needs it, or it is neutral and untouched. DEFER means loan origination or pipeline work that would wait until after the slice. PARK means real listing data or listing authority. 2o (monetization) stays TABLED, as the user decided 2026-11-09.
+PROPOSED, AWAITING THE USER'S CONFIRMATION (the user answered the four questions above on 2026-11-12 but has not yet confirmed this table; the ITP row was adjusted to match decision (c) and the other rows that cited questions (a) and (d) now point at the decisions). Nothing below has been changed in the items themselves: the items keep their current text and status until the user confirms or corrects this table. KEEP means the slice or the infrastructure and security already built needs it, or it is neutral and untouched. DEFER means loan origination or pipeline work that would wait until after the slice. PARK means real listing data or listing authority. 2o (monetization) stays TABLED, as the user decided 2026-11-09.
 
 | Item | Class | Reason |
 |---|---|---|
@@ -61,7 +95,7 @@ PROPOSED, AWAITING THE USER'S CONFIRMATION. Nothing below has been changed in th
 | 2b items 2, 3, 4, 5, 6 (token storage, guard, logout, oddities) | KEEP | Frontend auth hygiene, applies to every page. |
 | 2b item 11 (workbench Output cleared after invite) | DEFER | Workbench polish. |
 | 2c steps 3 to 5 (mail seam, email provider, send invites) | DEFER | The slice uses operator-printed links; email is not needed. |
-| 2c-1 Principle: only the account holder knows their password | KEEP | Governs the demo accounts (question (a)). |
+| 2c-1 Principle: only the account holder knows their password | KEEP | Governs the demo accounts (decision (a)). |
 | 2d CRUD the whole backend: owners, agreement and ledger reads for the owner | KEEP | An owner reading their own terms is the slice. |
 | 2d CRUD: institution, officer, agreement update, owners update, financial entities, owner split of an active property | DEFER | Officer and institution administration; ledger CRUD is blocked on user answers. |
 | 2e Marketplace: buyer `/listings` page, listing detail view, step 4 (drop legacy loan columns) | KEEP | Displays the house; the Loan split is cleanup of the terms model. |
@@ -69,12 +103,13 @@ PROPOSED, AWAITING THE USER'S CONFIRMATION. Nothing below has been changed in th
 | 2f Officer activation links (step 5 docs) | KEEP | Built; only the docs step remains. |
 | 2g Bootstrap secret (infra step 2 not applied) | KEEP | Operator infrastructure; the user runs `terraform apply`. |
 | 2h PropertyListing: the buyer listings page (step 4, buyer half) | KEEP | The house listing. |
-| 2h PropertyListing: officer listing management UI (step 4, officer half), statuses and the underwriting stage list, Intent to Proceed and rate lock, camelCase role rename (step 6) | DEFER | Pipeline stages and officer tooling. |
-| 2h PropertyListing: photos and blob storage (step 5) | DEFER | Depends on question (d); text-only first. |
+| 2h PropertyListing: officer listing management UI (step 4, officer half), statuses and the underwriting stage list, rate lock, the listing `sold` transition, camelCase role rename (step 6) | DEFER | Pipeline stages and officer tooling. |
+| 2h Intent to Proceed and application filed: ONLY the two timestamps (`intentToProceedAt`, `applicationFiledAt`), set by the seed (S1, S3) | KEEP (changed 2026-11-12) | Decision (c): the house is shown as belonging to the buyers once the application is filed and there is an ITP. Rate lock, underwriting, and any officer UI to set them stay DEFER. |
+| 2h PropertyListing: photos and blob storage (step 5) | DEFER | Decision (d): an SVG illustration is used when there is no photo; photos stay deferred. |
 | 2i Ability-to-repay checklist | DEFER | Loan origination (underwriting). |
 | 2j Under Offer and the buyer waitlist | DEFER | Pipeline and notification. |
 | 2k One officer login across several institutions | DEFER | Institution-side identity. |
-| 2l Two-factor authentication (built parts, remaining hardening) | KEEP | Security already built; the owner and user credential part needs a decision with question (a). |
+| 2l Two-factor authentication (built parts, remaining hardening) | KEEP | Security already built; the owner and user credential part owners are not challenged at login today (`auth.py:182-201`), so decision (a) is not blocked by it. |
 | 2l UI polish, admin role, reset | DEFER | Officer-side administration. |
 | 2m Co-applicant visibility (borrower income, assets) | DEFER | Loan application data. |
 | 2n Unified login (built), `/bootstrap` (built) | KEEP | Built; accounts for the slice sign in here. |
