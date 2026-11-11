@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps.auth import (
     Principal,
     require_institution_user,
+    require_institution_user_unrotated,
     require_user,
     require_user_or_institution_user,
     require_user_property_scope,
@@ -46,6 +47,7 @@ from app.schemas.user_property import OwnerInviteCreate
 from app.services.auth import (
     issue_institution_invite_token,
     issue_invite_token,
+    refresh_and_store_institution_token,
     unusable_password_hash,
 )
 
@@ -131,7 +133,7 @@ def _property_read(prop: Property) -> PropertyRead:
 def create_property(
     payload: PropertyCreate,
     response: Response,
-    principal: Principal = Depends(require_institution_user),
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     if principal.institution_id != payload.institutionId:
@@ -142,6 +144,10 @@ def create_property(
     db.add(prop)
     db.commit()
     db.refresh(prop)
+    # Rotate on the success path only: a 403/422 cannot carry X-Refreshed-Token, so rotating earlier would strand the
+    # officer with a dead token.
+    officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
     return _property_read(prop)
 
 
