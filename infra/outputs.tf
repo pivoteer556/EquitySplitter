@@ -61,9 +61,12 @@ output "bootstrap_token" {
 }
 
 # DNS records to create for the custom domain (see infra/CUSTOM_DOMAIN.md). The token is empty
-# once Azure has validated the domain.
+# once Azure has validated the domain. The provider marks it sensitive, so the output must be
+# sensitive too: it is hidden in plan/apply output; read it with
+# `terraform output -raw custom_domain_txt_token`.
 output "custom_domain_txt_token" {
-  value = azurerm_static_web_app_custom_domain.web.validation_token
+  value     = azurerm_static_web_app_custom_domain.web.validation_token
+  sensitive = true
 }
 
 output "custom_domain_cname_target" {

@@ -12,7 +12,9 @@ a missing TXT record. It creates the resource and exposes `validation_token`; th
 
 1. Run `terraform apply` in `infra/` (you run it). It creates the custom domain (status "validating") and updates
    the Container App's CORS setting.
-2. Read the values: `terraform output custom_domain_txt_token` and `terraform output custom_domain_cname_target`.
+2. Read the values: `terraform output -raw custom_domain_txt_token` and
+   `terraform output -raw custom_domain_cname_target`. Terraform hides the token in plan/apply output because the
+   provider marks it sensitive; `-raw` prints it anyway.
 3. In Cloudflare DNS for `equitysplitter.app`, add (both **DNS only**, grey cloud, NOT proxied; a proxied record
    stops Azure validating and issuing the certificate):
 
