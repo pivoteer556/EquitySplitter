@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps.auth import (
@@ -44,6 +45,8 @@ from app.schemas.property import PropertyCreate, PropertyRead, PropertyUpdate
 from app.schemas.property_agreement import PropertyAgreementCreate, PropertyAgreementRead
 from app.schemas.user_property import OwnerInviteCreate
 from app.services.auth import (
+    EMAIL_TAKEN,
+    ensure_officer_email_free,
     issue_institution_invite_token,
     issue_invite_token,
     unusable_password_hash,
@@ -75,9 +78,14 @@ def create_institution_user(
 ):
     if principal.institution_id != payload.institutionId:
         raise HTTPException(status_code=403, detail="Loan officer not authorized for institution")
+    ensure_officer_email_free(db, payload.email)
     inst_user = InstitutionUser(**payload.model_dump(), passwordHash=unusable_password_hash(), passwordSetAt=None)
     db.add(inst_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:  # lost a race with the same email: the UNIQUE constraint is the backstop
+        db.rollback()
+        raise HTTPException(status_code=409, detail=EMAIL_TAKEN) from None
     db.refresh(inst_user)
     token = issue_institution_invite_token(db, inst_user.id)
     read = InstitutionUserRead.model_validate(inst_user)

@@ -264,6 +264,17 @@ def activate_institution_user(db: Session, token: str, password: str) -> tuple[I
     return officer, refresh_and_store_institution_token(db, officer)  # commits the hash and the session iat together
 
 
+EMAIL_TAKEN = "Email already registered"  # same detail as /auth/register
+
+
+def ensure_officer_email_free(db: Session, email: str) -> None:
+    """409 if an officer already has this email. institutionUsers.email is UNIQUE across all institutions (exact
+    match, like the column); buyers live in `users` and do not count. Callers also catch IntegrityError on commit
+    (a lost race), because this check is not atomic with the insert."""
+    if db.query(InstitutionUser.id).filter(InstitutionUser.email == email).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=EMAIL_TAKEN)
+
+
 def bootstrap_institution(
     db: Session,
     institution_name: str,
@@ -272,9 +283,7 @@ def bootstrap_institution(
 ) -> tuple[Institution, InstitutionUser, str]:
     """Create an institution and its first officer, who has no password until they activate. Returns the one-time
     activation token (no session exists before activation)."""
-    existing = db.query(InstitutionUser).filter(InstitutionUser.email == officer_email).first()
-    if existing is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+    ensure_officer_email_free(db, officer_email)
 
     institution = Institution(name=institution_name)
     db.add(institution)

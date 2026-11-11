@@ -18,8 +18,9 @@ cause and fix it once.
    surgery. If the fix for one bug is a list of near-identical edits, the code was duplicated.
    - Example: the token-rotation fix was applied to about 20 endpoints one at a time, each a copy of the last.
 3. **Two things that should behave consistently don't.**
-   - Example: a malformed id is a 404 on one route, a 422 on another and a 500 on a third. A duplicate email is a 409
-     on `register` and a 500 on `POST /institution-users`. The same missing-or-forbidden property is a 404 for an
+   - Example: a malformed id is a 404 on one route, a 422 on another and a 500 on a third. A duplicate email was a 409
+     on `register` and a 500 on `POST /institution-users` (fixed 2026-11-11). An officer email is lowercased
+     at login but not at creation (open, see the register). The same missing-or-forbidden property is a 404 for an
      officer and a 403 for a buyer.
 
 ## Data and interfaces
@@ -53,7 +54,7 @@ cause and fix it once.
   - Example: rotating the session commits the transaction, which expires every loaded row. Serialize first and rotate
     last, or every row is re-queried.
 - **Swallowed or unhandled errors.** An empty `except`, or no handling where one is needed. The unhandled
-  `IntegrityError` on a duplicate officer email is the second kind.
+  `IntegrityError` on a duplicate officer email was the second kind (fixed 2026-11-11).
 - **Long function or god function.** One function that validates, queries, decides, writes and formats. It is hard to
   test one part alone and easy to change the wrong part.
 - **Feature envy.** A function that mostly reaches into another object's data. The logic belongs next to that data.
@@ -123,7 +124,7 @@ High priority:
 
 | Smell | Why high |
 |---|---|
-| Duplicate officer email on `POST /institution-users` is an unhandled `IntegrityError` (500), while `register` and `bootstrap_institution` return 409 | A 500 for a real request, and inconsistent with the sibling routes. Small fix. |
+| Officer emails are not lowercased at creation but `/auth/login` lowercases, so a mixed-case officer can never sign in (same gap on `invite_owner`'s buyer email) | Hurts real users today, and create and login disagree. Fix once in the request schemas; needs a live data check first. |
 
 Low priority (parked):
 
@@ -140,6 +141,7 @@ Resolved:
 - 2026-11-10, session-token rotation as a per-endpoint call (`rotate_session` in about 20 handlers, plus dead rotating dependencies). Fixed by moving rotation into one place: `RotatingRoute` (`app/api/route.py`) rotates after the response, only below status 400, and the handlers carry no rotation code. `rotate_session`, the `*_unrotated` dependencies and the dead rotating dependencies are gone; a test enforces that every router uses `RotatingRoute`.
 - 2026-11-10, extra queries after rotation on two older list endpoints (`property_listings.list_listings`, the buyer connection-requests list). Resolved by the same change: the cause was rotating (and committing) inside the handler before serialization, and that no longer happens.
 - 2026-11-11, the missing-or-forbidden property smell and the repeated ownership checks (and the malformed-id `500` on `attach_agreement`, `invite_owner` and `acknowledge_agreement`). The user decided the rule: a missing object is a 404 and a forbidden one is a 403, everywhere; IDOR is answered by unguessable UUID ids plus an authorization check on every lookup, not by hiding existence. Fixed by one lookup, `load_property` (`app/api/deps/properties.py`), used by every handler that loads a property; an officer of another institution now gets 403 (was 404) on the read, update, delete, owners and listing routes.
+- 2026-11-11, the unhandled `IntegrityError` (500) on a duplicate officer email at `POST /institution-users`. Now `409 Email already registered`, same as `register`, through one helper (`ensure_officer_email_free`, `app/services/auth.py`) plus an `IntegrityError` backstop; `bootstrap_institution` shares the helper but still has no backstop (a true race stays a 500, low priority).
 
 Test smells already handled or tracked:
 
