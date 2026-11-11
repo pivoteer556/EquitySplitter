@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.api.deps.auth import (
     Principal,
     platform_admin_principal,
-    require_institution_user,
     require_institution_user_unrotated,
     rotate_session,
 )
@@ -343,10 +342,11 @@ def institution_activate(payload: AcceptInviteRequest, request: Request, db: Ses
 @router.post("/institution/revoke", status_code=status.HTTP_204_NO_CONTENT)
 def institution_revoke(
     payload: InstitutionRevokeRequest,
-    principal: Principal = Depends(require_institution_user),
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
-    target_id = principal.user_id if payload.institutionUserId is None else UUID(payload.institutionUserId)
+    # Never rotates: self-revoke kills the caller's token anyway, and a rejection must leave it usable.
+    target_id = principal.user_id if payload.institutionUserId is None else payload.institutionUserId
     if target_id != principal.user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin revoke not enabled")
 

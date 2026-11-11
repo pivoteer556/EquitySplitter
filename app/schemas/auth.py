@@ -109,7 +109,7 @@ class AcceptInviteRequest(BaseModel):
 
 
 class InstitutionRevokeRequest(BaseModel):
-    institutionUserId: str | None = None
+    institutionUserId: UUID | None = None
 
 
 class InstitutionBootstrapRequest(BaseModel):
