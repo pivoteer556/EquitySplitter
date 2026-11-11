@@ -27,7 +27,11 @@ async function enrolAndOpenSecurity(page: Page) {
 }
 
 const submit = async (page: Page, code: string) => {
-  await page.locator('#security-code').fill(code);
+  // Right after navigation Angular can still reset the field (ngModel's first write), leaving the button disabled: retry until the value sticks.
+  await expect(async () => {
+    await page.locator('#security-code').fill(code);
+    await expect(page.locator('#security-code')).toHaveValue(code, { timeout: 1000 });
+  }).toPass();
   await page.locator('#security-submit').click();
 };
 
