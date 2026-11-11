@@ -20,6 +20,18 @@
   --brand-shadow: 0 2px 10px rgba(224, 168, 0, 0.18);
   /* One-token switch for the keyboard focus ring (amber was 1.2:1 on the page and 1.8:1 on cream, below the 3:1 minimum). */
   --focus-ring: var(--brand-navy);
+  /* Suburban house illustration (app-house-illustration). Roof, trim, door and glass follow the brand; the rest has no
+     brand equivalent. A dark theme would override these in one place. */
+  --house-roof: var(--brand-navy);
+  --house-trim: var(--brand-blue-dark);
+  --house-door: var(--brand-amber);
+  --house-glass: var(--brand-blue);
+  --house-wall: #FFFFFF;
+  --house-lawn: #6B9A5B;
+  --house-tree: #4F7F4A;
+  --house-tree-dark: #3F6B3C;
+  --house-trunk: #6B4F3A;
+  --house-path: #E9E4D4;
 }
 
 body {
