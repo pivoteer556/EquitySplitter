@@ -9,6 +9,7 @@ from app.api.deps.auth import (
     require_institution_user,
     require_institution_user_unrotated,
     require_user_or_institution_user,
+    require_user_or_institution_user_unrotated,
     require_user_property_scope,
     require_user_unrotated,
     rotate_session,
@@ -348,7 +349,11 @@ def list_listings(
 
 
 def _readable_property(db: Session, principal: Principal, property_id: str) -> Property:
-    prop = db.query(Property).filter(Property.id == UUID(property_id)).first()
+    try:
+        prop_id = UUID(property_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Property not found") from None  # same as a missing property
+    prop = db.query(Property).filter(Property.id == prop_id).first()
     if principal.user_type == "institution_user":
         # Another institution's property is indistinguishable from a missing one (no existence leak).
         if prop is None or prop.institutionId != principal.institution_id:
@@ -364,12 +369,15 @@ def _readable_property(db: Session, principal: Principal, property_id: str) -> P
 def get_property(
     propertyId: str,
     response: Response,
-    principal: Principal = Depends(require_user_or_institution_user),
+    principal: Principal = Depends(require_user_or_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
+    # Rotate on the success path only: a 403/404 cannot carry X-Refreshed-Token, so rotating earlier would strand the
+    # caller with a dead token.
+    rotate_session(db, principal, response)
     return {
         "property": _property_read(prop).model_dump(),
         "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else None,
@@ -420,13 +428,15 @@ def delete_property(
 def list_owners(
     propertyId: str,
     response: Response,
-    principal: Principal = Depends(require_user_or_institution_user),
+    principal: Principal = Depends(require_user_or_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
+    # Rotate on the success path only (both returns): a 403/404 cannot carry X-Refreshed-Token.
     if agreement is None:
+        rotate_session(db, principal, response)
         return {"owners": []}  # no agreement attached, so nobody can have been invited yet
 
     rows = (
@@ -453,4 +463,5 @@ def list_owners(
         )
         for up, u, ack in rows
     ]
+    rotate_session(db, principal, response)
     return {"owners": owners}
