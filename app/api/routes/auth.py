@@ -12,6 +12,7 @@ from app.api.deps.auth import (
     platform_admin_principal,
     require_institution_user,
     require_institution_user_unrotated,
+    rotate_session,
 )
 from app.api.routes.totp import TotpEnrollment
 from app.core.config import settings
@@ -393,5 +394,5 @@ def regenerate_recovery_codes(
     db.query(RecoveryCode).filter(RecoveryCode.institutionUserId == officer.id).delete(synchronize_session=False)
     db.add_all(RecoveryCode(institutionUserId=officer.id, codeHash=totp.hash_recovery_code(c)) for c in codes)
     db.commit()
-    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+    rotate_session(db, principal, response)
     return RecoveryCodesResponse(recoveryCodes=codes)

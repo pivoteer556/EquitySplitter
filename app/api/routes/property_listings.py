@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_institution_user_unrotated
+from app.api.deps.auth import Principal, require_institution_user_unrotated, rotate_session
 from app.api.routes.equity_splitter import _readable_property
 from app.db.session import get_db
-from app.models import InstitutionUser, PropertyListing
+from app.models import PropertyListing
 from app.models.property_listing import EDITABLE_LISTING_STATUSES, LISTING_TRANSITIONS
 from app.schemas.property_listing import (
     PropertyListingCreate,
@@ -16,18 +16,8 @@ from app.schemas.property_listing import (
     PropertyListingTransition,
     PropertyListingUpdate,
 )
-from app.services.auth import refresh_and_store_institution_token
 
 router = APIRouter()
-
-
-def _rotate_session(db: Session, principal: Principal, response: Response) -> None:
-    """Rotate the officer's session token only after the handler succeeded. A 4xx (404/409/422) cannot carry
-    X-Refreshed-Token, so rotating up front (require_institution_user) would strand the caller with a dead token.
-    Same pattern as regenerate_recovery_codes and the TOTP enroll/confirm endpoints."""
-    officer = db.get(InstitutionUser, principal.user_id)
-    assert officer is not None  # the auth dependency just loaded this row
-    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
 
 
 @router.post(
@@ -45,7 +35,7 @@ def create_listing(
     db.add(listing)
     db.commit()
     db.refresh(listing)
-    _rotate_session(db, principal, response)
+    rotate_session(db, principal, response)
     return listing
 
 
@@ -63,7 +53,7 @@ def list_listings(
         .order_by(PropertyListing.createdAt.desc(), PropertyListing.id)
         .all()
     )
-    _rotate_session(db, principal, response)
+    rotate_session(db, principal, response)
     return listings
 
 
@@ -124,7 +114,7 @@ def transition_listing(
         db.rollback()
         raise HTTPException(status_code=409, detail=_ALREADY_LISTED) from None
     db.refresh(listing)
-    _rotate_session(db, principal, response)
+    rotate_session(db, principal, response)
     return listing
 
 
@@ -143,5 +133,5 @@ def update_listing(
         setattr(listing, field, value)
     db.commit()
     db.refresh(listing)
-    _rotate_session(db, principal, response)
+    rotate_session(db, principal, response)
     return listing

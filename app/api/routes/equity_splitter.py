@@ -11,6 +11,7 @@ from app.api.deps.auth import (
     require_user_or_institution_user,
     require_user_property_scope,
     require_user_unrotated,
+    rotate_session,
 )
 from app.db.session import get_db
 from app.models import (
@@ -47,8 +48,6 @@ from app.schemas.user_property import OwnerInviteCreate
 from app.services.auth import (
     issue_institution_invite_token,
     issue_invite_token,
-    refresh_and_store_institution_token,
-    refresh_and_store_user_token,
     unusable_password_hash,
 )
 
@@ -147,8 +146,7 @@ def create_property(
     db.refresh(prop)
     # Rotate on the success path only: a 403/422 cannot carry X-Refreshed-Token, so rotating earlier would strand the
     # officer with a dead token.
-    officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
-    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+    rotate_session(db, principal, response)
     return _property_read(prop)
 
 
@@ -180,8 +178,7 @@ def attach_agreement(
     db.refresh(agreement)
     # Rotate on the success path only: a 403/404/409/422 cannot carry X-Refreshed-Token, so rotating earlier would
     # strand the officer with a dead token.
-    officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
-    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+    rotate_session(db, principal, response)
     return agreement
 
 
@@ -241,8 +238,7 @@ def invite_owner(
         result = _with_invite_token(db, user, existing_ack)
         # Rotate on the success path only: a 400/403/404/422 cannot carry X-Refreshed-Token, so rotating earlier would
         # strand the officer with a dead token.
-        officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
-        response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+        rotate_session(db, principal, response)
         return result
 
     ack = OwnerAcknowledgement(agreementId=agreement.id, userPropertyId=user_property.id, signedAt=None)
@@ -252,8 +248,7 @@ def invite_owner(
     result = _with_invite_token(db, user, ack)
     # Rotate on the success path only: a 400/403/404/422 cannot carry X-Refreshed-Token, so rotating earlier would
     # strand the officer with a dead token.
-    officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
-    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+    rotate_session(db, principal, response)
     return result
 
 
@@ -303,8 +298,7 @@ def acknowledge_agreement(
     db.refresh(ack)
     # Rotate on the success path only: a 403/404 cannot carry X-Refreshed-Token, so rotating earlier would strand the
     # owner with a dead token.
-    user = db.query(User).filter(User.id == principal.user_id).one()
-    response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
+    rotate_session(db, principal, response)
     return ack
 
 

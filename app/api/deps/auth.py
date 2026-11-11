@@ -44,7 +44,7 @@ def require_user_unrotated(
 ) -> Principal:
     """Like require_user but leaves the stored session token alone. For endpoints that can reject the caller AFTER
     authentication (404/409/422): those responses cannot carry X-Refreshed-Token, so rotating first would strand the
-    caller with a dead token. Such an endpoint rotates itself, after success, with refresh_and_store_user_token."""
+    caller with a dead token. Such an endpoint rotates itself, after success, with rotate_session."""
     claims = decode_token(db, _extract_bearer(authorization))
     return _user_principal(None, db, claims)
 
@@ -93,7 +93,7 @@ def require_institution_user_unrotated(
     """Like require_institution_user but leaves the stored session token alone. For endpoints that can reject the
     caller AFTER authentication (a wrong TOTP code): a 401 cannot carry X-Refreshed-Token, so rotating first would
     strand the caller with a dead token. Such an endpoint rotates itself, after success, with
-    refresh_and_store_institution_token."""
+    rotate_session."""
     claims = decode_token(db, _extract_bearer(authorization))
     return _institution_principal(None, db, claims)
 
@@ -126,12 +126,23 @@ def require_user_or_institution_user(
     return _user_principal(response, db, claims)
 
 
+def rotate_session(db: Session, principal: Principal, response: Response) -> None:
+    """Rotate the caller's stored session token and hand the new one back in X-Refreshed-Token. Endpoints that use an
+    *_unrotated dependency call this only after they succeeded (a 4xx cannot carry the header)."""
+    if principal.user_type == "institution_user":
+        officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
+        response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+    else:
+        user = db.query(User).filter(User.id == principal.user_id).one()
+        response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
+
+
 def require_user_or_institution_user_unrotated(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Principal:
     """Like require_user_or_institution_user but leaves the stored session token alone. The endpoint rotates itself,
-    after success, with refresh_and_store_user_token / refresh_and_store_institution_token."""
+    after success, with rotate_session."""
     claims = decode_token(db, _extract_bearer(authorization))
     if claims.get("userType") == "institution_user":
         return _institution_principal(None, db, claims)
