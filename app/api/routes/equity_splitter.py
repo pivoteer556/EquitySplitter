@@ -197,7 +197,7 @@ def invite_owner(
     propertyId: str,
     payload: OwnerInviteCreate,
     response: Response,
-    principal: Principal = Depends(require_institution_user),
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
@@ -237,13 +237,23 @@ def invite_owner(
         .first()
     )
     if existing_ack is not None:
-        return _with_invite_token(db, user, existing_ack)
+        result = _with_invite_token(db, user, existing_ack)
+        # Rotate on the success path only: a 400/403/404/422 cannot carry X-Refreshed-Token, so rotating earlier would
+        # strand the officer with a dead token.
+        officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
+        response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+        return result
 
     ack = OwnerAcknowledgement(agreementId=agreement.id, userPropertyId=user_property.id, signedAt=None)
     db.add(ack)
     db.commit()
     db.refresh(ack)
-    return _with_invite_token(db, user, ack)
+    result = _with_invite_token(db, user, ack)
+    # Rotate on the success path only: a 400/403/404/422 cannot carry X-Refreshed-Token, so rotating earlier would
+    # strand the officer with a dead token.
+    officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
+    return result
 
 
 @router.post("/properties/{propertyId}/acknowledge", response_model=AcknowledgementRead)
