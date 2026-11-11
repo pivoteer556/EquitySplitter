@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import AuthSecretState, Institution, InstitutionUser, TokenRevocation, User, UserProperty
+from app.schemas.types import normalize_email
 
 PASSWORD_POLICY = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$")
 
@@ -221,7 +222,7 @@ def create_platform_admin(db: Session, email: str) -> str:
     existing one, and return a one-time set-password token from the SAME generator as owner invites
     (issue_invite_token, redeemed at accept-invite). Never sets or changes a password; refuses to promote an
     ordinary account."""
-    email = email.strip()
+    email = normalize_email(email)
     user = db.query(User).filter(User.email == email).first()
     if user is None:
         user = User(

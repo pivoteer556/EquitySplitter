@@ -20,7 +20,10 @@ cause and fix it once.
 3. **Two things that should behave consistently don't.**
    - Example: a malformed id is a 404 on one route, a 422 on another and a 500 on a third. A duplicate email was a 409
      on `register` and a 500 on `POST /institution-users` (fixed 2026-11-11). An officer email is lowercased
-     at login but not at creation (open, see the register). The same missing-or-forbidden property is a 404 for an
+     at login but was not at creation (fixed 2026-11-11). Two request schemas validated the same field two different
+     ways: `AuthRegisterRequest` stripped and lowercased an email while `InstitutionUserCreate` and `OwnerInviteCreate`
+     took it as is, and three copies of the same validator sat in one file. That is the duplication signal; one
+     function (`normalize_email`) replaced them. The same missing-or-forbidden property is a 404 for an
      officer and a 403 for a buyer.
 
 ## Data and interfaces
@@ -118,13 +121,13 @@ A high-priority smell becomes the top of the backlog as its own item (with the e
 it before ordinary feature work. A low-priority smell is written down here and in the backlog's parking section, and
 nothing more.
 
-### Current register (2026-11-10, updated 2026-11-11)
+### Current register (2026-11-10, updated 2026-11-11: no open high-priority rows)
 
 High priority:
 
 | Smell | Why high |
 |---|---|
-| Officer emails are not lowercased at creation but `/auth/login` lowercases, so a mixed-case officer can never sign in (same gap on `invite_owner`'s buyer email) | Hurts real users today, and create and login disagree. Fix once in the request schemas; needs a live data check first. |
+| (none open) | The register has no open high-priority rows as of 2026-11-11. |
 
 Low priority (parked):
 
@@ -142,6 +145,7 @@ Resolved:
 - 2026-11-10, extra queries after rotation on two older list endpoints (`property_listings.list_listings`, the buyer connection-requests list). Resolved by the same change: the cause was rotating (and committing) inside the handler before serialization, and that no longer happens.
 - 2026-11-11, the missing-or-forbidden property smell and the repeated ownership checks (and the malformed-id `500` on `attach_agreement`, `invite_owner` and `acknowledge_agreement`). The user decided the rule: a missing object is a 404 and a forbidden one is a 403, everywhere; IDOR is answered by unguessable UUID ids plus an authorization check on every lookup, not by hiding existence. Fixed by one lookup, `load_property` (`app/api/deps/properties.py`), used by every handler that loads a property; an officer of another institution now gets 403 (was 404) on the read, update, delete, owners and listing routes.
 - 2026-11-11, the unhandled `IntegrityError` (500) on a duplicate officer email at `POST /institution-users`. Now `409 Email already registered`, same as `register`, through one helper (`ensure_officer_email_free`, `app/services/auth.py`) plus an `IntegrityError` backstop; `bootstrap_institution` shares the helper but still has no backstop (a true race stays a 500, low priority).
+- 2026-11-11, officer, owner-invite and bootstrap emails normalized inconsistently (a mixed-case officer could never sign in; the same buyer could become two rows). Fixed once: every request schema that takes an email uses `normalize_email` (`app/schemas/types.py`) through `NormalizedEmail` or `NormalizedEmailStr`, and a generic test checks every `*Create` or `*Request` model with an email field. The database columns are still case-sensitive (a `citext` or `lower(email)` index is a possible hardening); live data had 0 uppercase emails (user check, 2026-11-11).
 
 Test smells already handled or tracked:
 

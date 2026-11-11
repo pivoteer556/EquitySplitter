@@ -1,39 +1,21 @@
-import re
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.institution import InstitutionRead, InstitutionUserRead
-
-EMAIL_PATTERN = re.compile(r"^[^@]+@[^@]+$")
+from app.schemas.types import NormalizedEmail, NormalizedEmailStr
 
 
 class AuthRegisterRequest(BaseModel):
     name: str
-    email: str
+    email: NormalizedEmail
     password: str
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, value: str) -> str:
-        email = value.strip().lower()
-        if not EMAIL_PATTERN.match(email):
-            raise ValueError("Invalid email format")
-        return email
 
 
 class AuthLoginRequest(BaseModel):
-    email: str
+    email: NormalizedEmail
     password: str
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, value: str) -> str:
-        email = value.strip().lower()
-        if not EMAIL_PATTERN.match(email):
-            raise ValueError("Invalid email format")
-        return email
 
 
 class AuthTokenResponse(BaseModel):
@@ -119,15 +101,7 @@ class InstitutionBootstrapRequest(BaseModel):
 
     institutionName: str
     officerName: str
-    officerEmail: EmailStr
-
-    @field_validator("officerEmail")
-    @classmethod
-    def validate_email(cls, value: str) -> str:
-        email = value.strip().lower()
-        if not EMAIL_PATTERN.match(email):
-            raise ValueError("Invalid email format")
-        return email
+    officerEmail: NormalizedEmailStr
 
 
 class InstitutionBootstrapResponse(BaseModel):

@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
+from app.schemas.types import NormalizedEmailStr
+
 # The one vocabulary of professional roles (validated on create, filtered on the directory).
 ProfessionalRole = Literal["loan_officer", "underwriter", "broker"]
 PROFESSIONAL_ROLES: tuple[str, ...] = get_args(ProfessionalRole)
@@ -28,7 +30,7 @@ class InstitutionUserCreate(BaseModel):
 
     institutionId: UUID
     name: str
-    email: EmailStr
+    email: NormalizedEmailStr
     role: ProfessionalRole = "loan_officer"
 
 

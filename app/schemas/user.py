@@ -3,10 +3,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
+from app.schemas.types import NormalizedEmailStr
+
 
 class UserCreate(BaseModel):
     name: str
-    email: EmailStr
+    email: NormalizedEmailStr
 
 
 class UserRead(BaseModel):
