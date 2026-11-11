@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alex Wilkening – Software engineer</title>
+<meta name="description" content="Career explorer for Alex Wilkening, a full-stack engineer who builds production systems, works out why delivery breaks, and uses AI agents to make both more reliable.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f6f7fa;
+  --ink: #14213d;
+  --muted: #4a5568;
+  --rule: #d3d9e4;
+  --mark-bg: #f2c94c;
+  --mark-ink: #14213d;
+  --focus: #1d4ed8;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Serif 4", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1524;
+    --ink: #e9edf5;
+    --muted: #aab4c8;
+    --rule: #27334c;
+    --mark-bg: #f2c94c;
+    --mark-ink: #0e1524;
+    --focus: #8ab4ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1524;
+  --ink: #e9edf5;
+  --muted: #aab4c8;
+  --rule: #27334c;
+  --mark-bg: #f2c94c;
+  --mark-ink: #0e1524;
+  --focus: #8ab4ff;
+  color-scheme: dark;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 10; }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.2em; }
+a:hover { background: var(--mark-bg); color: var(--mark-ink); text-decoration-color: transparent; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+.shell {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+  column-gap: clamp(2rem, 6vw, 5rem);
+}
+.rail { position: sticky; top: 2rem; align-self: start; }
+.name { font-family: var(--display); font-weight: 800; font-size: 1.75rem; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 0.35rem; }
+.role-line { margin: 0 0 2rem; color: var(--muted); font-size: 1rem; }
+.lens-title { font-family: var(--display); font-weight: 700; font-size: 1rem; margin: 0 0 0.5rem; }
+.lens { display: flex; flex-direction: column; gap: 0.15rem; margin: 0 0 2rem; padding: 0; list-style: none; }
+.lens button {
+  font: inherit; font-family: var(--display); font-weight: 500; font-size: 1rem;
+  width: 100%; min-height: 2.75rem; text-align: left;
+  padding: 0.5rem 0.75rem; border: 0; border-radius: 0.35rem;
+  background: transparent; color: var(--ink); cursor: pointer;
+}
+@media (hover: hover) { .lens button:hover { background: color-mix(in srgb, var(--mark-bg) 35%, transparent); } }
+.lens button[aria-pressed="true"] { background: var(--mark-bg); color: var(--mark-ink); font-weight: 700; }
+.contact { margin: 0; font-size: 1rem; }
+.contact p { margin: 0 0 0.4rem; }
+.status { margin: 0 0 2rem; font-size: 0.95rem; color: var(--muted); min-height: 1.5em; }
+
+.thesis {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(2.4rem, 6vw, 4.25rem); line-height: 1.02; letter-spacing: -0.03em;
+  margin: 0 0 1.5rem; max-width: 15ch;
+}
+.lead { font-size: 1.3rem; line-height: 1.55; max-width: 38rem; margin: 0 0 3rem; }
+h2.section {
+  font-family: var(--display); font-weight: 700; font-size: 1.35rem; letter-spacing: -0.01em;
+  margin: 4rem 0 1.25rem; padding-top: 1rem; border-top: 2px solid var(--ink);
+}
+.proof { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1.5rem 2rem; }
+.proof li { margin: 0; }
+.proof .fig { display: block; font-family: var(--display); font-weight: 800; font-size: 1.9rem; line-height: 1.1; letter-spacing: -0.02em; }
+.proof .cap { display: block; margin-top: 0.25rem; color: var(--muted); font-size: 1rem; line-height: 1.45; }
+
+.role { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); column-gap: 2rem; padding: 1.75rem 0; border-top: 1px solid var(--rule); }
+.role:first-of-type { border-top: 0; padding-top: 0; }
+.when { margin: 0.35rem 0 0; font-family: var(--display); font-weight: 500; font-size: 0.95rem; color: var(--muted); line-height: 1.35; }
+.role h3 { font-family: var(--display); font-weight: 700; font-size: 1.4rem; letter-spacing: -0.015em; margin: 0; line-height: 1.2; }
+.role .what { margin: 0.15rem 0 0.9rem; color: var(--muted); font-size: 1rem; }
+.role ul, .project ul { margin: 0; padding-left: 1.2rem; }
+.role li, .project li { margin: 0 0 0.6rem; padding-left: 0.2rem; }
+.project h3 { font-family: var(--display); font-weight: 700; font-size: 1.4rem; margin: 0; letter-spacing: -0.015em; }
+.project .what { margin: 0.15rem 0 0.9rem; color: var(--muted); font-size: 1rem; }
+
+.skills { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1.75rem 2.5rem; }
+.skill-group h3 { font-family: var(--display); font-weight: 700; font-size: 1.05rem; margin: 0 0 0.35rem; display: inline; padding: 0 0.15rem; }
+.skill-group p { margin: 0.35rem 0 0; font-size: 1rem; line-height: 1.5; }
+.skill-group.is-match h3 { background: var(--mark-bg); color: var(--mark-ink); }
+.skill-group.quiet { opacity: 0.55; }
+
+.off { display: none; }
+.closing { margin-top: 4rem; }
+.closing p { margin: 0 0 0.75rem; }
+
+@media (max-width: 56rem) {
+  .shell { display: block; padding: 1.5rem max(1.25rem, env(safe-area-inset-right, 0px)) 4rem max(1.25rem, env(safe-area-inset-left, 0px)); }
+  .rail { display: contents; }
+  .name { margin: 0 0 0.25rem; }
+  .role-line { margin: 0 0 1rem; }
+  .rail nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); padding: 0.5rem 0; margin: 0 0 1rem; border-bottom: 1px solid var(--rule); }
+  .lens-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
+  .lens { flex-direction: row; flex-wrap: nowrap; gap: 0.4rem; margin: 0; padding: 0 0 0.1rem; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .lens::-webkit-scrollbar { display: none; }
+  .lens li { flex: 0 0 auto; }
+  .lens button { width: auto; white-space: nowrap; border: 1px solid var(--rule); }
+  .lens button[aria-pressed="true"] { border-color: var(--mark-bg); }
+  .status { margin: 0 0 1.5rem; }
+  .contact { display: none; }
+  .thesis { margin-bottom: 1rem; }
+  .lead { font-size: 1.15rem; margin-bottom: 2rem; scroll-margin-top: 5rem; }
+  h2.section { margin-top: 3rem; }
+  .role { grid-template-columns: 1fr; }
+  .when { margin: 0 0 0.25rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lens button { transition: background-color 0.18s ease; }
+}
+@media print {
+  body { font-size: 11pt; background: #fff; color: #000; }
+  .shell { display: block; padding: 0; }
+  .rail .lens-title, .rail .lens, .rail .status { display: none; }
+  .rail { position: static; }
+  .off { display: revert !important; }
+  .skill-group.quiet { opacity: 1; }
+  .thesis { font-size: 26pt; }
+  h2.section { break-after: avoid; }
+  .role, .project { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="rail">
+    <h1 class="name">Alex Wilkening</h1>
+    <p class="role-line">Full-stack engineer in Minneapolis, Minnesota</p>
+
+    <nav aria-label="Career views">
+      <p class="lens-title" id="lens-label">Explore my career by</p>
+      <ul class="lens" role="list" aria-labelledby="lens-label">
+        <li><button type="button" data-lens="all" aria-pressed="true">Everything</button></li>
+        <li><button type="button" data-lens="ai-agents" aria-pressed="false">AI and agents</button></li>
+        <li><button type="button" data-lens="delivery" aria-pressed="false">Delivery and process</button></li>
+        <li><button type="button" data-lens="platform" aria-pressed="false">Cloud and platform</button></li>
+        <li><button type="button" data-lens="domains" aria-pressed="false">Housing, finance, logistics</button></li>
+      </ul>
+    </nav>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+
+    <div class="contact">
+      <p><a href="mailto:Alexander.V.Wilkening@gmail.com">Alexander.V.Wilkening@gmail.com</a></p>
+      <p><a href="https://github.com/pivoteer556/EquitySplitter" target="_blank" rel="noopener noreferrer">EquitySplitter on GitHub</a></p>
+      <p><a href="https://gray-sand-05d747c0f.4.azurestaticapps.net/login" target="_blank" rel="noopener noreferrer">EquitySplitter live demo</a></p>
+    </div>
+  </aside>
+
+  <main>
+    <p class="thesis">Software should resemble the work it supports.</p>
+    <p class="lead" id="lead"></p>
+
+    <h2 class="section" style="margin-top:0">Selected results</h2>
+    <ul class="proof">
+      <li data-tags="delivery domains"><span class="fig">23 days</span><span class="cap">from kickoff to broad release for a three-party UAD appraisal integration, with no end-user bugs reported in pilot</span></li>
+      <li data-tags="ai-agents"><span class="fig">99.74%</span><span class="cap">accuracy on an LLM extraction task across diverse real-world datasets</span></li>
+      <li data-tags="delivery platform"><span class="fig">Net-negative</span><span class="cap">line count across seven months of routine frontend work that also tripled the app’s functionality and removed dozens of bugs</span></li>
+      <li data-tags="ai-agents platform"><span class="fig">5 to 260+ tests</span><span class="cap">added to a personal API by a build-and-review agent workflow, alongside argon2id hashing and CI that blocks known CVEs</span></li>
+    </ul>
+
+    <h2 class="section">Career</h2>
+
+    <article class="role">
+      <p class="when">Aug 2026 – Nov 2026</p>
+      <div>
+        <h3>Kind Lending</h3>
+        <p class="what">Senior full stack engineer, remote</p>
+        <ul>
+          <li data-tags="ai-agents delivery">Created the company’s Claude skills repository and wrote every skill in it: Jira ticket creation, story-to-task breakdown, an end-to-end skill that takes a story from “To Do” to a reviewed pull request, and a port-forwarding skill for running several builds side by side.</li>
+          <li data-tags="ai-agents delivery">Designed a sequential three-agent workflow in which agents build and review each other’s work, so quality checks happen inside the pipeline.</li>
+          <li data-tags="delivery domains">Owned a new UAD appraisal system as near-sole developer. A three-party integration went from kickoff to broad release in 23 days, with no end-user bugs reported in the pilot.</li>
+          <li data-tags="domains">Redesigned closing disclosure fee entry around the five amount columns on page 2 of the form, defaulting to the one amount most users need and expanding to the rest on demand.</li>
+          <li data-tags="domains">Named Lead Engineer in the project RACI for a new Initial Closing Disclosure system: property insurance data, non-borrowing occupants, fees with change-of-circumstance handling, a TRID tolerance calculator, and insurance impound calculations.</li>
+          <li data-tags="platform delivery">One of two developers on an Angular 9 to 22 migration. Reported the remote code execution vulnerability that got the long-stalled migration prioritized and approved.</li>
+          <li data-tags="delivery platform">Drove adoption of trunk-based development and minimum verifiable change as the unit of work, and delivered the first Bicep infrastructure-as-code configuration for the backend.</li>
+          <li data-tags="delivery">Read Google’s 2024 and 2025 DORA reports in full, polled the team on which of DORA’s seven team archetypes they identified with, and walked executives through DORA’s performance model. Leadership then expanded the planned process changes.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="role">
+      <p class="when">Oct 2025 – Aug 2026</p>
+      <div>
+        <h3>Veterans United Home Loans</h3>
+        <p class="what">Senior full stack engineer, contract, remote</p>
+        <ul>
+          <li data-tags="ai-agents">Engineered prompts that reached 99.74% accuracy on a five-column spreadsheet PDF extraction task across diverse real-world datasets.</li>
+          <li data-tags="ai-agents platform">Sole developer of the backend comparison layer that matches LLM output against structured database records, using AI-assisted development for the Python pipeline scripts, which were reviewed, verified, and integrated into production.</li>
+          <li data-tags="delivery domains">Across seven months of routine feature and bug work, shaped the frontend’s data handling around the real-world domain. The result was a net-negative line count, the app’s functionality tripled, dozens of bugs fixed, and better speed, which enabled wider product rollout.</li>
+          <li data-tags="ai-agents delivery">Used Claude Code to establish new team standards and build reusable development tooling.</li>
+          <li data-tags="platform delivery">Improved CI/CD pipelines to reduce developer churn and speed up deployments.</li>
+          <li data-tags="domains">Configured 2015 itemization forms in Encompass to generate valid test data for the closing disclosure editing tool.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="role">
+      <p class="when">May 2023 – Aug 2025</p>
+      <div>
+        <h3>Patterson Companies</h3>
+        <p class="what">Software engineer II, remote</p>
+        <ul>
+          <li data-tags="platform delivery">Led architecture and development of a cloud-based Angular microfrontend for a scheduling overhaul, on a C# backend. It launched to early access with zero customer-reported impediments.</li>
+          <li data-tags="platform">Reduced the primary GET endpoint from a 48-field response object to a single GUID, improving performance.</li>
+          <li data-tags="delivery platform">Audited the codebase and delivered simplifications that produced some of the most stable code in the organization.</li>
+          <li data-tags="delivery">Mentored junior engineers informally on code quality, patterns, and best practices.</li>
+          <li data-tags="ai-agents">Built an LLM-based chatbot in a hackathon using Azure AI and OpenAI 3.5.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="role">
+      <p class="when">Nov 2021 – May 2023</p>
+      <div>
+        <h3>Nexient (Launch by NTT Data)</h3>
+        <p class="what">Full stack engineer, consultant</p>
+        <ul>
+          <li data-tags="delivery">Embedded as a consultant across two client engagements, Leaf Home (home improvement) and ITS Logistics. Two-time Team of the Month recipient, and cited by leadership for technical skill, leadership, and tenacity.</li>
+          <li data-tags="ai-agents domains">At ITS Logistics, rewrote the bill of lading system for port operations, feeding cargo ship manifests into an AI language model to automate confirmation.</li>
+          <li data-tags="platform">Created and maintained Azure Service Bus topics and queues so intermittent product failures no longer caused customer orders to be lost. Dead-lettered messages turned silent failures into visible, recoverable ones.</li>
+          <li data-tags="platform">Built cloud-native microservices in a hexagonal architecture on Azure, with Docker, Kubernetes, and Terraform.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="role">
+      <p class="when">Jul 2021 – Nov 2021</p>
+      <div>
+        <h3>Veterans United Home Loans</h3>
+        <p class="what">Full stack engineer, contract</p>
+        <ul>
+          <li data-tags="domains delivery">Lead developer on a four-month payments API expansion serving customers and realtors. It went live with zero early production issues despite a short-staffed team.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="role">
+      <p class="when">Dec 2020 – Jul 2021</p>
+      <div>
+        <h3>ManageAmerica Integrated Billing Services</h3>
+        <p class="what">Full stack developer</p>
+        <ul>
+          <li data-tags="domains delivery">Delivered a utility billing automation for a mobile home park billing platform, eliminating more than 200 hours a month of manual effort.</li>
+          <li data-tags="platform">Maintained and modernized a legacy web stack while building new features in Angular 12.</li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="role">
+      <p class="when">May 2019 – Dec 2020</p>
+      <div>
+        <h3>CBE Companies</h3>
+        <p class="what">Software developer, Cedar Falls, Iowa</p>
+        <ul>
+          <li data-tags="platform delivery">Led developer-side execution of a CRM migration to Windows 10, including a UI performance effort that cut load times by more than a third.</li>
+          <li data-tags="platform">Co-led a new API that significantly reduced the time collections staff spent on their work.</li>
+        </ul>
+      </div>
+    </article>
+
+    <h2 class="section">Project</h2>
+    <article class="project">
+      <h3><a href="https://github.com/pivoteer556/EquitySplitter" target="_blank" rel="noopener noreferrer">EquitySplitter</a></h3>
+      <p class="what">Python, FastAPI, PostgreSQL, Azure</p>
+      <p>Try the early, barebones <a href="https://gray-sand-05d747c0f.4.azurestaticapps.net/login" target="_blank" rel="noopener noreferrer">live demo</a>. The repository shows the full build and deploy pipeline behind it.</p>
+      <ul>
+        <li data-tags="ai-agents domains">Architected a spec-driven API for shared mortgage equity, with the equity ledger as the single source of truth. The first version was built with Claude as product owner and Codex as coder.</li>
+        <li data-tags="ai-agents platform">Then ran a multi-agent build-and-review workflow over the repository. It replaced salted SHA-256 password hashing with argon2id, added rate limiting and a signed-token invitation flow, grew the test suite from 5 to 260+, and cleared known dependency vulnerabilities.</li>
+        <li data-tags="ai-agents platform">Locked down account creation: bootstrapping an institution requires a signed-in platform admin plus a setup token, and officers and owners are issued one-time activation links so no one else ever chooses their password. Officers must enrol an authenticator at first sign-in, and every sign-in then needs a one-time code that can’t be replayed. Single-use recovery codes cover a lost device and are stored only as keyed hashes.</li>
+        <li data-tags="platform">Containerized the API and defined its Azure footprint in Terraform: Container Apps, Container Registry, PostgreSQL, Key Vault, and a GitHub identity for deployment.</li>
+        <li data-tags="platform delivery">Built the delivery pipeline. CI runs linting, type checks, dependency scanning, tests on two Python versions, migrations against PostgreSQL, Angular specs, an end-to-end browser suite, and Docker and Terraform validation. After it passes, the exact validated commit deploys to Azure with no stored cloud credentials, and the deploy fails if the new revision doesn’t answer its health check.</li>
+      </ul>
+    </article>
+
+    <h2 class="section">Skills</h2>
+    <div class="skills">
+      <section class="skill-group" data-lens-match="ai-agents">
+        <h3>AI and agents</h3>
+        <p>Multi-agent build-and-review workflows, tool use and multi-step workflows, prompt engineering and evaluation, validating LLM output against structured data, Claude Code and MCP server setup, Claude Skills, OpenAI, LangChain, LangSmith, AI integrations on Azure.</p>
+      </section>
+      <section class="skill-group" data-lens-match="platform">
+        <h3>Backend and platform</h3>
+        <p>C# and .NET, Python (FastAPI, SQLAlchemy, Pydantic), TypeScript, SQL Server, PostgreSQL, REST APIs, ETL pipelines, asynchronous messaging with Azure Service Bus and dead-letter handling, JWT authentication with key rotation, rate limiting, hexagonal microservices.</p>
+      </section>
+      <section class="skill-group" data-lens-match="platform">
+        <h3>Cloud-native and infrastructure</h3>
+        <p>Docker, Kubernetes, Azure (Container Apps, Key Vault, DevOps, APIM, Application Insights), Terraform, Bicep, GitHub Actions with OIDC deployment, CI/CD.</p>
+      </section>
+      <section class="skill-group" data-lens-match="delivery">
+        <h3>Quality and delivery</h3>
+        <p>pytest, ruff, mypy, pip-audit, trunk-based development, minimum verifiable change, DORA metrics and team archetype research, security review of AI-generated code.</p>
+      </section>
+      <section class="skill-group" data-lens-match="domains">
+        <h3>Domains</h3>
+        <p>Mortgage origination (closing disclosures, TRID, UAD appraisals, Encompass), payments and billing, logistics (bills of lading, cargo manifests, port operations).</p>
+      </section>
+      <section class="skill-group" data-lens-match="platform">
+        <h3>Frontend</h3>
+        <p>Angular, including a 9 to 22 migration.</p>
+      </section>
+    </div>
+
+    <h2 class="section">Education and teaching</h2>
+    <p>University of Northern Iowa, class of 2019: B.A. in Computer Science and B.A. in Music, with an emphasis in composition.</p>
+    <p>Music instructor at Zoom Twin Cities Music School since February 2023. Top-rated, with 5 of 7 students retained for a year or more. Teaching taught me to meet people where they are, which carries straight into mentoring engineers and explaining technical change to leadership.</p>
+
+    <div class="closing">
+      <p>Want the details behind any of this? <a href="mailto:Alexander.V.Wilkening@gmail.com">Email me</a>.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  var lenses = {
+    "all": "Seven years building production systems, learning why delivery breaks, and bringing AI agents into the work in ways that can be checked. Pick a view on the left to see only the part of my career that matters to you.",
+    "ai-agents": "Where AI work meets production: prompts measured against real data, workflows that review their own output, and the guardrails that make both trustworthy.",
+    "delivery": "Why work stalls and what actually changes it: smaller units of work, evidence from research and from the team, and the conversations with leadership that get change adopted.",
+    "platform": "The plumbing that keeps software running: cloud infrastructure, pipelines, messaging that survives failure, and migrations that finally ship.",
+    "domains": "Mortgage, billing, payments, and logistics: regulated, correctness-sensitive work where the software has to match how the process really runs."
+  };
+  var buttons = Array.prototype.slice.call(document.querySelectorAll("[data-lens]"));
+  var tagged = Array.prototype.slice.call(document.querySelectorAll("[data-tags]"));
+  var bullets = tagged.filter(function (el) { return el.tagName === "LI" && !el.closest(".proof"); });
+  var roles = Array.prototype.slice.call(document.querySelectorAll(".role, .project"));
+  var groups = Array.prototype.slice.call(document.querySelectorAll(".skill-group"));
+  var lead = document.getElementById("lead");
+  var status = document.getElementById("status");
+
+  function matches(el, name) {
+    return name === "all" || el.getAttribute("data-tags").split(" ").indexOf(name) !== -1;
+  }
+
+  function apply(name) {
+    if (!lenses.hasOwnProperty(name)) { name = "all"; }
+    buttons.forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-lens") === name ? "true" : "false");
+    });
+    lead.textContent = lenses[name];
+    tagged.forEach(function (el) { el.classList.toggle("off", !matches(el, name)); });
+    roles.forEach(function (role) {
+      var any = role.querySelector("li[data-tags]:not(.off)");
+      role.classList.toggle("off", !any);
+    });
+    groups.forEach(function (g) {
+      var on = name !== "all" && g.getAttribute("data-lens-match") === name;
+      g.classList.toggle("is-match", on);
+      g.classList.toggle("quiet", name !== "all" && !on);
+    });
+    var shown = bullets.filter(function (el) { return !el.classList.contains("off"); }).length;
+    status.textContent = name === "all"
+      ? "Showing all " + bullets.length + " highlights."
+      : "Showing " + shown + " of " + bullets.length + " highlights.";
+  }
+
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      var name = b.getAttribute("data-lens");
+      if (location.hash.slice(1) === name) { apply(name); } else { location.hash = name; }
+      if (window.matchMedia("(max-width: 56rem)").matches) {
+        var calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.requestAnimationFrame(function () { lead.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }); });
+      }
+    });
+  });
+  window.addEventListener("hashchange", function () { apply(location.hash.slice(1)); });
+  apply(location.hash.slice(1) || "all");
+})();
+</script>
+</body>
+</html>
