@@ -40,8 +40,9 @@ run `terraform apply`, then delete the TXT and CNAME records in Cloudflare.
 
 ## After it works
 
-Switch the resume's demo link and the README link from the default `azurestaticapps.net` hostname to
-`https://equitysplitter.app` (not done yet).
+Done on 2026-11-11 for the resume page (`/hireme`) only: its demo links now use
+`https://equitysplitter.app`. The repository README has no link to the old address, so nothing to change there.
+The old default `azurestaticapps.net` address still works.
 
 ## Verification status
 
