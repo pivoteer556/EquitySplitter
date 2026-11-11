@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps.auth import (
     Principal,
-    require_institution_user,
     require_institution_user_unrotated,
     require_user_or_institution_user_unrotated,
     require_user_property_scope,
@@ -399,7 +398,7 @@ def update_property(
     propertyId: str,
     payload: PropertyUpdate,
     response: Response,
-    principal: Principal = Depends(require_institution_user),
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
@@ -417,13 +416,17 @@ def update_property(
                 setattr(prop.loan, field, changes[field])
     db.commit()
     db.refresh(prop)
-    return _property_read(prop)
+    result = _property_read(prop)  # before the rotation commit expires the row
+    # Rotate on the success path only: a 403/404/422 cannot carry X-Refreshed-Token.
+    rotate_session(db, principal, response)
+    return result
 
 
 @router.delete("/properties/{propertyId}", status_code=204)
 def delete_property(
     propertyId: str,
-    principal: Principal = Depends(require_institution_user),
+    response: Response,
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
@@ -431,7 +434,11 @@ def delete_property(
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
     db.delete(prop)  # ORM cascades remove agreement, loan, owner links and their acknowledgements; Users stay
     db.commit()
-    return Response(status_code=204)
+    # Rotate on the success path only. The header goes on the Response we return: headers set on the injected
+    # `response` are dropped when a handler returns its own Response.
+    resp = Response(status_code=204)
+    rotate_session(db, principal, resp)
+    return resp
 
 
 @router.get("/properties/{propertyId}/owners", response_model=PropertyOwnersRead)
