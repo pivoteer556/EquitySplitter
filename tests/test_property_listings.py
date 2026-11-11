@@ -62,15 +62,16 @@ def test_missing_price_is_422(client, officer):
     assert _create(client, officer, prop["id"], {"bedrooms": 2}).status_code == 422
 
 
-def test_other_institution_gets_404_same_as_unknown(client, officer):
+def test_other_institution_gets_403_unknown_is_404(client, officer):
     prop = _property(client, officer)
     other = _second_officer(client)
     cross = _create(client, other, prop["id"])
     unknown = _create(client, other, "00000000-0000-4000-8000-000000000000")
-    assert cross.status_code == unknown.status_code == 404
-    assert cross.json() == unknown.json()
+    assert cross.status_code == 403
+    assert cross.json() == {"detail": "Loan officer not authorized for institution"}
+    assert unknown.status_code == 404
     listing = client.get(_url(prop["id"]), headers=bearer(other["accessToken"]))
-    assert listing.status_code == 404
+    assert listing.status_code == 403
 
 
 def test_unknown_property_404_for_owner_institution(client, officer):

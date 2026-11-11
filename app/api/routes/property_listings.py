@@ -6,8 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import Principal, require_institution_user
+from app.api.deps.properties import load_property
 from app.api.route import RotatingRoute
-from app.api.routes.equity_splitter import _readable_property
 from app.db.session import get_db
 from app.models import PropertyListing
 from app.models.property_listing import EDITABLE_LISTING_STATUSES, LISTING_TRANSITIONS
@@ -30,7 +30,7 @@ def create_listing(
     principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = _readable_property(db, principal, property_id)  # another institution's property looks nonexistent
+    prop = load_property(db, principal, property_id)
     listing = PropertyListing(propertyId=prop.id, status="draft", **payload.model_dump())
     db.add(listing)
     db.commit()
@@ -44,7 +44,7 @@ def list_listings(
     principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = _readable_property(db, principal, property_id)
+    prop = load_property(db, principal, property_id)
     listings = (
         db.query(PropertyListing)
         .filter(PropertyListing.propertyId == prop.id)
@@ -55,7 +55,7 @@ def list_listings(
 
 
 def _own_listing(db: Session, principal: Principal, listing_id: str) -> PropertyListing:
-    """Another institution's listing looks nonexistent, exactly like an unknown id."""
+    """A listing is owned through its property: unknown or malformed id is a 404, another institution's a 403."""
     try:
         uid = UUID(listing_id)
     except ValueError:
@@ -63,7 +63,7 @@ def _own_listing(db: Session, principal: Principal, listing_id: str) -> Property
     listing = db.get(PropertyListing, uid)
     if listing is None:
         raise HTTPException(status_code=404, detail="Property not found")
-    _readable_property(db, principal, str(listing.propertyId))
+    load_property(db, principal, listing.propertyId)
     return listing
 
 

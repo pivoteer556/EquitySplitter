@@ -40,14 +40,14 @@ def test_officer_reads_owners_of_own_property(client, officer):
 
 
 @pytest.mark.parametrize("route", [0, 1])
-def test_other_institution_looks_like_nonexistent(client, officer, route):
+def test_other_institution_is_forbidden_missing_is_404(client, officer, route):
     other = _second_officer(client)
     prop = _property(client, officer)
     _agreement(client, officer, prop["id"])
     real, token = _get(client, other["accessToken"], _urls(prop["id"])[route])
     missing, _ = _get(client, token, _urls(uuid4())[route])
-    assert real.status_code == missing.status_code == 404
-    assert real.json() == missing.json()
+    assert (real.status_code, real.json()) == (403, {"detail": "Loan officer not authorized for institution"})
+    assert (missing.status_code, missing.json()) == (404, {"detail": "Property not found"})
 
 
 @pytest.mark.parametrize("route", [0, 1])

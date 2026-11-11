@@ -117,16 +117,13 @@ A high-priority smell becomes the top of the backlog as its own item (with the e
 it before ordinary feature work. A low-priority smell is written down here and in the backlog's parking section, and
 nothing more.
 
-### Current register (2026-11-10)
+### Current register (2026-11-10, updated 2026-11-11)
 
 High priority:
 
 | Smell | Why high |
 |---|---|
-| Malformed ids give 404, 422 or 500 depending on the route (`attach_agreement`, `invite_owner`, `acknowledge_agreement` still 500) | A 500 on bad input, and an inconsistent API contract that is cheap to settle now. |
-| A missing property is a 404 for an officer of another institution but a 403 for an unlinked buyer | Two answers for the same case. Rule decided by the user 2026-11-11: missing is 404, forbidden is 403 (an IDOR concern is answered by unguessable UUIDs and an authorization check on every lookup, not by hiding existence). Implement it in one lookup helper. |
 | Duplicate officer email on `POST /institution-users` is an unhandled `IntegrityError` (500), while `register` and `bootstrap_institution` return 409 | A 500 for a real request, and inconsistent with the sibling routes. Small fix. |
-| Property-ownership checks rewritten in each handler | Multiplies, and feeds the 404/403 inconsistency above. Same fix. |
 
 Low priority (parked):
 
@@ -142,6 +139,7 @@ Resolved:
 
 - 2026-11-10, session-token rotation as a per-endpoint call (`rotate_session` in about 20 handlers, plus dead rotating dependencies). Fixed by moving rotation into one place: `RotatingRoute` (`app/api/route.py`) rotates after the response, only below status 400, and the handlers carry no rotation code. `rotate_session`, the `*_unrotated` dependencies and the dead rotating dependencies are gone; a test enforces that every router uses `RotatingRoute`.
 - 2026-11-10, extra queries after rotation on two older list endpoints (`property_listings.list_listings`, the buyer connection-requests list). Resolved by the same change: the cause was rotating (and committing) inside the handler before serialization, and that no longer happens.
+- 2026-11-11, the missing-or-forbidden property smell and the repeated ownership checks (and the malformed-id `500` on `attach_agreement`, `invite_owner` and `acknowledge_agreement`). The user decided the rule: a missing object is a 404 and a forbidden one is a 403, everywhere; IDOR is answered by unguessable UUID ids plus an authorization check on every lookup, not by hiding existence. Fixed by one lookup, `load_property` (`app/api/deps/properties.py`), used by every handler that loads a property; an officer of another institution now gets 403 (was 404) on the read, update, delete, owners and listing routes.
 
 Test smells already handled or tracked:
 

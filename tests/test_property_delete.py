@@ -104,15 +104,15 @@ def test_active_property_cannot_be_deleted(client, officer, session_factory):
     assert s.call("GET", f"/properties/{prop['id']}").status_code == 200
 
 
-def test_other_institution_looks_like_nonexistent(client, officer):
+def test_other_institution_is_forbidden_missing_is_404(client, officer):
     other = _second_officer(client)
     prop = _property(client, officer)
     _agreement(client, officer, prop["id"])
     s = Session(client, other["accessToken"])
     real = s.delete(prop["id"])
     missing = s.delete(str(uuid4()))
-    assert real.status_code == missing.status_code == 404
-    assert real.json() == missing.json() == {"detail": "Property not found"}
+    assert (real.status_code, real.json()) == (403, {"detail": "Loan officer not authorized for institution"})
+    assert (missing.status_code, missing.json()) == (404, {"detail": "Property not found"})
     assert Session(client, officer["accessToken"]).call("GET", f"/properties/{prop['id']}").status_code == 200
 
 

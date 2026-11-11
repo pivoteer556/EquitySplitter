@@ -114,7 +114,7 @@ def test_integrity_error_is_409(client, officer, monkeypatch):
     assert sorted(r["status"] for r in rows) == ["draft", "listed"]
 
 
-def test_other_institution_and_unknown_are_identical_404(client, officer):
+def test_other_institution_is_403_unknown_is_404(client, officer):
     _, lst = _draft(client, officer)
     other = _second_officer(client)
     for call in (
@@ -122,8 +122,10 @@ def test_other_institution_and_unknown_are_identical_404(client, officer):
         lambda i: _patch(client, other, i, {"description": "x"}),
     ):
         cross, unknown = call(lst["id"]), call(MISSING)
-        assert cross.status_code == unknown.status_code == 404
-        assert cross.json() == unknown.json()
+        assert cross.status_code == 403
+        assert unknown.status_code == 404
+        assert cross.json() == {"detail": "Loan officer not authorized for institution"}
+        assert unknown.json() == {"detail": "Property not found"}
     assert _move(client, officer, lst["id"], "listed").status_code == 200  # untouched by the other officer
 
 

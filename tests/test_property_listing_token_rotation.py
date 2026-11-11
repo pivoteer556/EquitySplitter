@@ -38,7 +38,7 @@ def test_create_for_other_institutions_property_keeps_token(client, officer, clo
     other = _second_officer(client)
     prop = _property(client, other)
     _tick(clock)
-    _assert_rejected_keeps_token(client, clock, officer, _create(client, officer, prop["id"]), 404)
+    _assert_rejected_keeps_token(client, clock, officer, _create(client, officer, prop["id"]), 403)
 
 
 def test_create_with_invalid_body_keeps_token(client, officer, clock):

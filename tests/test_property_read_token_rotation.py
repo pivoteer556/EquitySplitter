@@ -63,7 +63,7 @@ def _other_institution(session_factory):
 @pytest.fixture(params=["buyer", "officer"])
 def who(request, client, officer):
     if request.param == "officer":
-        return SimpleNamespace(token=officer["accessToken"], officer=True, foreign_status=404)
+        return SimpleNamespace(token=officer["accessToken"], officer=True, foreign_status=403)
     return SimpleNamespace(token=_buyer(client).token, officer=False, foreign_status=403)
 
 
@@ -79,7 +79,7 @@ def rejected(request, who, suffix, session_factory):
         prop_id, expected = "not-a-uuid", 404
     elif request.param == "unknown":
         prop_id, expected = str(uuid4()), 404
-    else:  # another institution's property: officer sees nothing (404), buyer is not linked to it (403)
+    else:  # another institution's property: the officer is not authorized (403), the buyer is not linked to it (403)
         prop_id, expected = _seed(session_factory, _other_institution(session_factory)), who.foreign_status
     return f"/api/v1/properties/{prop_id}{suffix}", expected
 

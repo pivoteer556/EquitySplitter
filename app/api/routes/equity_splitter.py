@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, selectinload
@@ -9,8 +8,8 @@ from app.api.deps.auth import (
     require_institution_user,
     require_user,
     require_user_or_institution_user,
-    require_user_property_scope,
 )
+from app.api.deps.properties import load_property
 from app.api.route import RotatingRoute
 from app.db.session import get_db
 from app.models import (
@@ -152,11 +151,7 @@ def attach_agreement(
     principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
-    if prop is None:
-        raise HTTPException(status_code=404, detail="Property not found")
-    if principal.institution_id != prop.institutionId:
-        raise HTTPException(status_code=403, detail="Loan officer not authorized for institution")
+    prop = load_property(db, principal, propertyId)
     if prop.status == "active":
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
 
@@ -186,11 +181,7 @@ def invite_owner(
     principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
-    if prop is None:
-        raise HTTPException(status_code=404, detail="Property not found")
-    if principal.institution_id != prop.institutionId:
-        raise HTTPException(status_code=403, detail="Loan officer not authorized for institution")
+    prop = load_property(db, principal, propertyId)
     if prop.status == "active":
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
 
@@ -240,9 +231,7 @@ def acknowledge_agreement(
     principal: Principal = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
-    if prop is None:
-        raise HTTPException(status_code=404, detail="Property not found")
+    prop = load_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     if agreement is None:
@@ -251,10 +240,8 @@ def acknowledge_agreement(
     user_property = (
         db.query(UserProperty)
         .filter(UserProperty.userId == principal.user_id, UserProperty.propertyId == prop.id)
-        .first()
+        .one()  # load_property already proved the link
     )
-    if user_property is None:
-        raise HTTPException(status_code=403, detail="User is not an owner on this property")
 
     ack = (
         db.query(OwnerAcknowledgement)
@@ -321,30 +308,13 @@ def list_listings(
     return result
 
 
-def _readable_property(db: Session, principal: Principal, property_id: str) -> Property:
-    try:
-        prop_id = UUID(property_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Property not found") from None  # same as a missing property
-    prop = db.query(Property).filter(Property.id == prop_id).first()
-    if principal.user_type == "institution_user":
-        # Another institution's property is indistinguishable from a missing one (no existence leak).
-        if prop is None or prop.institutionId != principal.institution_id:
-            raise HTTPException(status_code=404, detail="Property not found")
-        return prop
-    if prop is None:
-        raise HTTPException(status_code=404, detail="Property not found")
-    require_user_property_scope(prop.id, principal, db)
-    return prop
-
-
 @router.get("/properties/{propertyId}", response_model=PropertyDetailRead)
 def get_property(
     propertyId: str,
     principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = _readable_property(db, principal, propertyId)
+    prop = load_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     return {
@@ -360,7 +330,7 @@ def update_property(
     principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
+    prop = load_property(db, principal, propertyId)
     if prop.status == "active":
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
     changes = payload.model_dump(exclude_unset=True)
@@ -385,7 +355,7 @@ def delete_property(
     principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
+    prop = load_property(db, principal, propertyId)
     if prop.status == "active":
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
     db.delete(prop)  # ORM cascades remove agreement, loan, owner links and their acknowledgements; Users stay
@@ -399,7 +369,7 @@ def list_owners(
     principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
-    prop = _readable_property(db, principal, propertyId)
+    prop = load_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
     if agreement is None:

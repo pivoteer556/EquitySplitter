@@ -99,7 +99,7 @@ def test_missing_property_keeps_token(client, clock):
 
 def test_missing_agreement_keeps_token(client, clock, session_factory):
     token = _buyer(client).token
-    resp = _post(client, clock, token, _seed(session_factory, parts=()))
+    resp = _post(client, clock, token, _seed(session_factory, parts=("link",)))
     _assert_rejected_keeps_token(client, clock, token, resp, 404)
 
 

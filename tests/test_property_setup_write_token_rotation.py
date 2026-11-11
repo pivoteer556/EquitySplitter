@@ -86,7 +86,7 @@ def test_missing_property_keeps_token(client, officer, clock, verb):
 def test_other_institution_keeps_token(client, officer, clock, session_factory, verb):
     prop_id = _seed(session_factory, institution_id=_other_institution(session_factory))
     resp = _call(client, clock, officer, verb, prop_id)
-    _assert_rejected_keeps_token(client, clock, officer, resp, 404)
+    _assert_rejected_keeps_token(client, clock, officer, resp, 403)
 
 
 @VERBS
