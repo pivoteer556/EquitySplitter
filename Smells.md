@@ -124,7 +124,7 @@ High priority:
 | Smell | Why high |
 |---|---|
 | Malformed ids give 404, 422 or 500 depending on the route (`attach_agreement`, `invite_owner`, `acknowledge_agreement` still 500) | A 500 on bad input, and an inconsistent API contract that is cheap to settle now. |
-| A missing property is a 404 for an officer of another institution but a 403 for an unlinked buyer | Two answers for the same case; the 403 tells a buyer that the property exists. Settle one rule in one lookup helper. |
+| A missing property is a 404 for an officer of another institution but a 403 for an unlinked buyer | Two answers for the same case. Rule decided by the user 2026-11-11: missing is 404, forbidden is 403 (an IDOR concern is answered by unguessable UUIDs and an authorization check on every lookup, not by hiding existence). Implement it in one lookup helper. |
 | Duplicate officer email on `POST /institution-users` is an unhandled `IntegrityError` (500), while `register` and `bootstrap_institution` return 409 | A 500 for a real request, and inconsistent with the sibling routes. Small fix. |
 | Property-ownership checks rewritten in each handler | Multiplies, and feeds the 404/403 inconsistency above. Same fix. |
 
