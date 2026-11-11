@@ -158,7 +158,7 @@ def attach_agreement(
     propertyId: str,
     payload: PropertyAgreementCreate,
     response: Response,
-    principal: Principal = Depends(require_institution_user),
+    principal: Principal = Depends(require_institution_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
@@ -177,6 +177,10 @@ def attach_agreement(
     db.add(agreement)
     db.commit()
     db.refresh(agreement)
+    # Rotate on the success path only: a 403/404/409/422 cannot carry X-Refreshed-Token, so rotating earlier would
+    # strand the officer with a dead token.
+    officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
     return agreement
 
 
