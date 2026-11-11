@@ -92,6 +92,59 @@ cause and fix it once.
   object.
   - Example: returning rows after the commit that rotates the token re-queried every row.
 
+## Triage: investigate now or later
+
+Triage decides where a smell goes. The user delegated this call to Claude (2026-11-10); the user can overrule any
+entry.
+
+**High priority: investigate now.** A smell is high priority if ANY of these holds:
+
+1. **It can hurt users or data today.** A security, privacy, data-integrity or correctness effect, including an
+   unhandled error that returns a 500 to a real request.
+2. **It multiplies.** Every new feature or endpoint adds another copy or another way to get it wrong, so the cost of
+   leaving it grows.
+3. **It is cheap now and expensive later.** It sits in a public API shape, a database schema or a stored value, where
+   changing it later means migrations, clients or data fixes.
+4. **It blocks planned work.** The next backlog item would have to build on it or copy it.
+
+**Low priority: investigate once we are down to outstanding questions.** All of these hold: it is contained to one
+place, it does not grow with new work, it has no user-visible or data effect, and nothing planned touches it. Cosmetic
+and stylistic smells are low priority unless they hide one of the high-priority cases.
+
+Tie-breaker: when unsure, ask whether a new teammate adding the next endpoint would copy the smell. If yes, it is high.
+
+A high-priority smell becomes the top of the backlog as its own item (with the example), and the next MAGI run takes
+it before ordinary feature work. A low-priority smell is written down here and in the backlog's parking section, and
+nothing more.
+
+### Current register (2026-11-10)
+
+High priority:
+
+| Smell | Why high |
+|---|---|
+| Session-token rotation is a per-endpoint call (`rotate_session` in about 20 handlers, plus dead rotating dependencies) | Multiplies (every new endpoint must remember it), touches sessions, and the dead dependencies bring the original bug back if used. Fix: rotate once, in a route-level wrapper. |
+| Malformed ids give 404, 422 or 500 depending on the route (`attach_agreement`, `invite_owner`, `acknowledge_agreement` still 500) | A 500 on bad input, and an inconsistent API contract that is cheap to settle now. |
+| A missing property is a 404 for an officer of another institution but a 403 for an unlinked buyer | Two answers for the same case; the 403 tells a buyer that the property exists. Settle one rule in one lookup helper. |
+| Duplicate officer email on `POST /institution-users` is an unhandled `IntegrityError` (500), while `register` and `bootstrap_institution` return 409 | A 500 for a real request, and inconsistent with the sibling routes. Small fix. |
+| Property-ownership checks rewritten in each handler | Multiplies, and feeds the 404/403 inconsistency above. Same fix. |
+
+Low priority (parked):
+
+| Smell | Why low |
+|---|---|
+| Extra queries after rotation on two older list endpoints (`property_listings.list_listings`, the buyer connection-requests list) | Performance only, same data. It goes away with the route-level rotation, so do not fix it separately. |
+| `# noqa: PLR0913` on `list_professionals` (limit and offset repeated on list routes) | Contained, cosmetic. A shared paging dependency is a tidy-up, not urgent. |
+| Copied e2e preambles, repeated 1100 ms waits and repeated rotation test helpers | Test-only. Folds into the route-level rotation work: one parametrized test replaces the per-endpoint files. |
+| Unreachable "institution id is None" check in `create_institution` and the unreachable 404 in revoke | Dead code with no effect; remove when next touching those functions. |
+| Stale comment at `app/api/routes/auth.py:377` | Misleading comment only. |
+| Comma-separated lists | Checked 2026-11-10: no id lists anywhere in the API, schema or UI. The only comma-separated value is the `CORS_ALLOW_ORIGINS` environment variable, which is configuration. Keep out of new APIs; no action now. |
+
+Test smells already handled or tracked:
+
+- The flaky `security.spec.ts` fill race (a fill racing form initialisation) is being fixed, so it is not parked.
+- "Tests that cannot fail": the rotation e2es are now checked against the old backend before they are accepted. Keep doing that.
+
 ## How to use this file
 
 When something feels wrong, or you are about to make the same edit a second time, check the list. If a smell fits,
