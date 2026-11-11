@@ -1,5 +1,99 @@
 # Backlog
 
+## Current focus (user decision 2026-11-12): the vertical slice
+
+The user's words (verbatim): "I think we need to de-scope some of the loan-origination plans I was making. For now, we need to focus on the following vertical slice. We need a house (we can AI generate some suburban listing), a set of accounts for people who've bought the house, and the various terms of their purchase modeled out and displayed. Then, we'll focus on tracking loans through the pipeline. I got overambitious with that."
+
+The slice has three parts, as the user stated them:
+
+1. A house: a synthetic, AI-generated suburban listing (not real listing data).
+2. A set of accounts for the people who bought the house.
+3. The various terms of their purchase, modeled out and displayed.
+
+ORDER: tracking loans through the pipeline comes AFTER the slice, not with it.
+
+DEFERRED because the slice uses synthetic data: the real-listing-data and listing-authority question (the "Listing authority model does not match how selling works" item in Open decisions below, and any idea of ingesting real listings from an MLS or a third-party API). Nothing in that item is built, so deferring it costs nothing; it is annotated there.
+
+PROPOSAL, NOT DECIDED (written 2026-11-12 by Casper from the code; the user has not confirmed any list below).
+
+What already exists that serves the slice (checked in `app/models`, `app/schemas`, `app/api/routes`, `frontend/app/src/app`):
+
+- `Property` (address, `loanAmount`, `currentBalance`, `monthlyPayment`, `dynamicBillingEnabled`, `status`) and `Loan` (the same four loan fields, split out in 2e; reads take the loan fields from the Loan row).
+- `PropertyAgreement`: `noticeDays`, `valuationMethod`, `partialClaimMethod`, `effectiveAt` (the shared-equity terms), attached by an officer (`POST /properties/{id}/agreement`).
+- `UserProperty` (owner link, with `maxOwnershipPercent`, a nullable cap) and `OwnerAcknowledgement` (`signedAt`); invite (`POST /properties/{id}/owners`) and acknowledge (`POST /properties/{id}/acknowledge`) endpoints.
+- `PropertyListing` (`askingPrice`, bedrooms, bathrooms, `squareFeet`, description, `listedAt`) with officer endpoints and the buyer-facing `GET /listings`, which shows only id, address, status and date.
+- `app/services/equity.py` (`calculate_equity_deltas`, `next_running_balance`: base and bonus equity for a payment) and the models `PaymentCycle` (`equityDue`, `interestDue`, `insuranceDue`, `hoaDue`, `otherDue`), `Payment`, `EquityLedger` (`runningBalance`), `EquityTransfer`, `TransferClaim`. These have NO endpoints yet (section 2d).
+- Accounts and sign-in: one login at `/login` for every account kind, `/accept-invite#token=...` (owner invite, owner sets their own password), `/activate` (officer), `/workbench` and `/security` (officer only), `/listings` (any signed-in user; owners land there after accept-invite).
+- One property lookup rule: `load_property` (`app/api/deps/properties.py`): missing or malformed id is 404, forbidden is 403.
+- The demo site: https://equitysplitter.app (custom domain on the Static Web App per `infra/CUSTOM_DOMAIN.md`, and the career page links to it, commit d49c07d). I did not check that it is live.
+
+Gaps the slice would need to close (PROPOSAL, not decided):
+
+- No owner-facing "my home" page: an owner has no screen that shows their property and its terms. After accept-invite an owner lands on `/listings`, which shows the buyer listing fields only. `GET /properties/{id}` and `/owners` already return the data to a linked owner (not displayed anywhere for owners).
+- The owner has no screen to acknowledge on (existing item in section 6; `/workbench` is officer-only).
+- No synthetic seed data and no seed script (only `scripts/create_platform_admin.py` exists in `scripts/`).
+- Purchase terms NOT MODELED (each checked against `app/models`): purchase price (only `PropertyListing.askingPrice` exists, which is an asking price, not what was paid); down payment per owner; each owner's actual ownership percent (only `UserProperty.maxOwnershipPercent`, a nullable cap, exists); interest rate; loan term; closing date; the monthly payment split per owner (`Property.monthlyPayment` and `Loan.monthlyPayment` are one number for the whole house; `PaymentCycle` has per-owner dues but no endpoint and nothing creates cycles). Modeled already: loan amount, current balance, monthly payment (whole house), and the agreement terms listed above.
+- No demo accounts story consistent with principle 2c-1 (only the account holder ever knows their password): how a visitor signs in as a co-buyer on the showcase needs a decision (question (a) below). Note that item 2l's decision (everyone uses 2FA, including owners) is not yet built for owners and would also affect a demo sign-in.
+
+### Open questions for the user before the slice is designed
+
+Each has a recommended default (mine; the user decides).
+
+(a) How should the co-buyer demo accounts sign in on the showcase, given principle 2c-1 (no passwords we create)? Options: (1) operator-generated one-time password-setup links printed by a seed script (the same link generator as invites; the operator or the user opens them and chooses a password); (2) a documented demo credential (a deliberate, written exception to 2c-1, with the account limited to demo data); (3) a read-only "view as" mode (a viewer sees an owner's page without signing in as them; needs a new, carefully scoped endpoint). Recommended default: (1), because it needs no exception and no new access path; revisit (3) if visitors must click in without any setup.
+
+(b) Exactly which purchase terms to model? Proposed list: purchase price; each owner's down payment and ownership percent; loan amount, interest rate, term, and the monthly payment split per owner; closing date; and the shared-equity agreement terms already modeled (notice days, valuation method, partial-claim method). What is missing, or too much? Recommended default: model that list, as plain stored values for display only (no calculation of amortization), and leave out anything that needs the equity ledger to run.
+
+(c) Should the slice show the house after purchase (owners already own it, terms displayed) or also the purchase process (invite, acknowledge, activate)? Recommended default: post-purchase first (seeded owners, terms displayed on a "my home" page), with the existing invite and acknowledge flow as step two.
+
+(d) House imagery: text-only listing first, or generated illustration or photos? Note that an AI model like Claude cannot generate photographs. Recommended default: text-only listing first (the schema already has the fields), then a simple SVG illustration, and a generated-image tool later if wanted. Photos would also need blob storage (2h step 5), which stays deferred.
+
+### Proposed deferral of loan-origination plans (CONFIRM with the user; not applied)
+
+PROPOSED, AWAITING THE USER'S CONFIRMATION. Nothing below has been changed in the items themselves: the items keep their current text and status until the user confirms or corrects this table. KEEP means the slice or the infrastructure and security already built needs it, or it is neutral and untouched. DEFER means loan origination or pipeline work that would wait until after the slice. PARK means real listing data or listing authority. 2o (monetization) stays TABLED, as the user decided 2026-11-09.
+
+| Item | Class | Reason |
+|---|---|---|
+| 0 Smell backlog | KEEP | Nothing open; parked smells stay parked. |
+| 1 Frontend hosting (step 5, live verification) | KEEP | The demo site is the showcase. |
+| 2 UI, items 1, 6, 7, 8 to 14 (login, accept-invite page, e2e, brand, contrast) | KEEP | Shell and look of the slice, mostly built. |
+| 2 UI, item 9 "designed screens" (officer property list, officer property detail, buyer listings with professionals directory) | KEEP (re-scope) | Closest to the slice, but the slice needs an owner "my home" screen first; the officer screens and the directory part wait. |
+| 2 UI, items 2, 3, 4 (workbench forms, copy and shell, toasts) | DEFER | Officer workbench polish. |
+| 2b items 2, 3, 4, 5, 6 (token storage, guard, logout, oddities) | KEEP | Frontend auth hygiene, applies to every page. |
+| 2b item 11 (workbench Output cleared after invite) | DEFER | Workbench polish. |
+| 2c steps 3 to 5 (mail seam, email provider, send invites) | DEFER | The slice uses operator-printed links; email is not needed. |
+| 2c-1 Principle: only the account holder knows their password | KEEP | Governs the demo accounts (question (a)). |
+| 2d CRUD the whole backend: owners, agreement and ledger reads for the owner | KEEP | An owner reading their own terms is the slice. |
+| 2d CRUD: institution, officer, agreement update, owners update, financial entities, owner split of an active property | DEFER | Officer and institution administration; ledger CRUD is blocked on user answers. |
+| 2e Marketplace: buyer `/listings` page, listing detail view, step 4 (drop legacy loan columns) | KEEP | Displays the house; the Loan split is cleanup of the terms model. |
+| 2e Marketplace: connection requests (accept, decline, cancel), professionals directory, NMLS, buyer-to-professional connection | DEFER | Pipeline: connecting buyers with lenders. |
+| 2f Officer activation links (step 5 docs) | KEEP | Built; only the docs step remains. |
+| 2g Bootstrap secret (infra step 2 not applied) | KEEP | Operator infrastructure; the user runs `terraform apply`. |
+| 2h PropertyListing: the buyer listings page (step 4, buyer half) | KEEP | The house listing. |
+| 2h PropertyListing: officer listing management UI (step 4, officer half), statuses and the underwriting stage list, Intent to Proceed and rate lock, camelCase role rename (step 6) | DEFER | Pipeline stages and officer tooling. |
+| 2h PropertyListing: photos and blob storage (step 5) | DEFER | Depends on question (d); text-only first. |
+| 2i Ability-to-repay checklist | DEFER | Loan origination (underwriting). |
+| 2j Under Offer and the buyer waitlist | DEFER | Pipeline and notification. |
+| 2k One officer login across several institutions | DEFER | Institution-side identity. |
+| 2l Two-factor authentication (built parts, remaining hardening) | KEEP | Security already built; the owner and user credential part needs a decision with question (a). |
+| 2l UI polish, admin role, reset | DEFER | Officer-side administration. |
+| 2m Co-applicant visibility (borrower income, assets) | DEFER | Loan application data. |
+| 2n Unified login (built), `/bootstrap` (built) | KEEP | Built; accounts for the slice sign in here. |
+| 2n Sign-up chooser (buy, sell, work), institution self-request, vetting, ADMIN role, selector | DEFER | Institution onboarding and a pipeline concern. |
+| 2o Revenue model | TABLED (stays) | User decision 2026-11-09. |
+| 3 Deploy hardening: migrations handling | KEEP | A seed script runs against the live database. |
+| 3 Deploy hardening: tested rollback, branch protection and approval environment | DEFER | Not on the slice's path. (My call; the user may want it kept.) |
+| 4 Static analysis | KEEP | Neutral, unchanged. |
+| 5 Terraform state and pipeline | KEEP | Neutral infrastructure, unchanged. |
+| 6 Smaller items: owner has no screen to acknowledge | KEEP | A slice gap (the owner screen). |
+| 6 Smaller items: `bootstrap_institution` race, e2e TOTP flake, other infrastructure items | KEEP | Neutral hygiene, unchanged. |
+| 6 Smaller items: the two `connection_requests` 404 decisions | DEFER | Marketplace connection requests are deferred. |
+| Open decisions: Listing authority model | PARK | Real listing data and agency or brokerage modeling; the slice is synthetic. |
+| Open decisions: Terraform state secrets before or after deploy work | KEEP | Neutral. |
+
+### What this block deliberately does not do
+
+It does not change any item below it, change code, specs or `Smells.md`, or decide anything for the user.
+
 Ordered list of work. One item per change, each proven by a check that fails before and passes after.
 Update this file in the same commit that finishes an item.
 
@@ -280,7 +374,7 @@ Why (user): "Let's document plan 1. We'll do it on a per-loan basis, and launch 
 
 ## Open decisions (user)
 
-- Listing authority model does not match how selling works (design decision needed; user correction 2026-11-11; NOT BUILT, nothing coded). WHAT REAL LIFE LOOKS LIKE (user: "Institutions don't put houses up for sale. People put houses up for sale, and real estate agents sign contracts to sell them through their agencies/agents. That's how it works in real life."): the seller is a person; the seller signs a listing agreement with a brokerage (an agency), and the listing agent at that brokerage enters the listing; buyers come with their own agents; lenders and underwriters come in later, on the buyer's side, for the loan. WHAT THE APP DOES TODAY: an institution's officer creates the property and the property listing. `app/models/property_listing.py` holds `askingPrice`, `bedrooms` and the like and a `draft`/`listed` status; the endpoints in `app/api/routes/property_listings.py` (`POST /properties/{id}/listings`, `GET /properties/{id}/listings`, `PATCH /property-listings/{id}`, `POST /property-listings/{id}/transition`) and `POST /properties` in `app/api/routes/equity_splitter.py` are guarded by officer plus institution (`load_property`, `app/api/deps/properties.py`); the role vocabulary is `loan_officer | underwriter | broker` (`ProfessionalRole`, `app/schemas/institution.py`) inside institutions that are modeled as lenders. NOT modeled: the seller as a person, the listing agreement between seller and brokerage, and a brokerage or agent concept (the `broker` role sits inside a lender institution). PROPOSED DIRECTION (a sketch, not decided): a brokerage kind of institution with agent users; a seller link from the property to a person (an existing `users` row) and ideally a record of the listing agreement; listing creation moves to the agent's side; lenders keep the loan terms and the shared-equity agreement. WHY IT MATTERS: any real listing data, for example from an MLS or a third-party API, comes from agents and brokerages, and licensing is the first hurdle, so data ingestion should NOT be built before this is settled; it is also a permission-model change (who may create and edit a listing), so the sooner it is settled the fewer endpoints and screens are built on the wrong model. OPEN QUESTIONS FOR THE USER: (1) in the product's story, who is the seller: an existing owner selling to a new shared-equity buyer, or something else? (2) is the lender's role the loan and the agreement only, with agents and brokerages creating the listings? BUILD NOTE: when built this is a permission-model change that needs the user's sign-off, a specs README amendment and a Feature 1 and Feature 2 docx change-log row in the same commit. EXISTING ITEMS IT AFFECTS (cross-reference only, not edited): 2h (PropertyListing, whose step 1 built officer-created listings and whose steps 2 to 4 build `GET /listings` and the officer listing UI on that model), 2e (marketplace: pending properties act as listings, buyers connect with professionals), 2i (ability-to-repay checklist, lender side, probably unaffected), 2j (Under Offer and the buyer waitlist, which depends on the listing's status and on who controls it), 2m (co-applicant visibility, buyer side, probably unaffected), 2o (revenue model: fee charged to institutions, which may need to say which institution kind pays). Specs README: its note on the officer listing endpoints (2026-11-11) says PLANNED, design question open.
+- Listing authority model does not match how selling works (**DEFERRED 2026-11-12, user decision: the vertical slice uses a synthetic, AI-generated listing, so this question and any real-listing-data ingestion wait; see "Current focus" at the top; the text below is unchanged history**) (design decision needed; user correction 2026-11-11; NOT BUILT, nothing coded). WHAT REAL LIFE LOOKS LIKE (user: "Institutions don't put houses up for sale. People put houses up for sale, and real estate agents sign contracts to sell them through their agencies/agents. That's how it works in real life."): the seller is a person; the seller signs a listing agreement with a brokerage (an agency), and the listing agent at that brokerage enters the listing; buyers come with their own agents; lenders and underwriters come in later, on the buyer's side, for the loan. WHAT THE APP DOES TODAY: an institution's officer creates the property and the property listing. `app/models/property_listing.py` holds `askingPrice`, `bedrooms` and the like and a `draft`/`listed` status; the endpoints in `app/api/routes/property_listings.py` (`POST /properties/{id}/listings`, `GET /properties/{id}/listings`, `PATCH /property-listings/{id}`, `POST /property-listings/{id}/transition`) and `POST /properties` in `app/api/routes/equity_splitter.py` are guarded by officer plus institution (`load_property`, `app/api/deps/properties.py`); the role vocabulary is `loan_officer | underwriter | broker` (`ProfessionalRole`, `app/schemas/institution.py`) inside institutions that are modeled as lenders. NOT modeled: the seller as a person, the listing agreement between seller and brokerage, and a brokerage or agent concept (the `broker` role sits inside a lender institution). PROPOSED DIRECTION (a sketch, not decided): a brokerage kind of institution with agent users; a seller link from the property to a person (an existing `users` row) and ideally a record of the listing agreement; listing creation moves to the agent's side; lenders keep the loan terms and the shared-equity agreement. WHY IT MATTERS: any real listing data, for example from an MLS or a third-party API, comes from agents and brokerages, and licensing is the first hurdle, so data ingestion should NOT be built before this is settled; it is also a permission-model change (who may create and edit a listing), so the sooner it is settled the fewer endpoints and screens are built on the wrong model. OPEN QUESTIONS FOR THE USER: (1) in the product's story, who is the seller: an existing owner selling to a new shared-equity buyer, or something else? (2) is the lender's role the loan and the agreement only, with agents and brokerages creating the listings? BUILD NOTE: when built this is a permission-model change that needs the user's sign-off, a specs README amendment and a Feature 1 and Feature 2 docx change-log row in the same commit. EXISTING ITEMS IT AFFECTS (cross-reference only, not edited): 2h (PropertyListing, whose step 1 built officer-created listings and whose steps 2 to 4 build `GET /listings` and the officer listing UI on that model), 2e (marketplace: pending properties act as listings, buyers connect with professionals), 2i (ability-to-repay checklist, lender side, probably unaffected), 2j (Under Offer and the buyer waitlist, which depends on the listing's status and on who controls it), 2m (co-applicant visibility, buyer side, probably unaffected), 2o (revenue model: fee charged to institutions, which may need to say which institution kind pays). Specs README: its note on the officer listing endpoints (2026-11-11) says PLANNED, design question open.
 - Do the Terraform state-secrets work before or after the remaining deploy work (leaning after)?
 
 ## Not yet verified
