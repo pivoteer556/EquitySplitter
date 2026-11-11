@@ -8,9 +8,9 @@ from app.api.deps.auth import (
     Principal,
     require_institution_user,
     require_institution_user_unrotated,
-    require_user,
     require_user_or_institution_user,
     require_user_property_scope,
+    require_user_unrotated,
 )
 from app.db.session import get_db
 from app.models import (
@@ -48,6 +48,7 @@ from app.services.auth import (
     issue_institution_invite_token,
     issue_invite_token,
     refresh_and_store_institution_token,
+    refresh_and_store_user_token,
     unusable_password_hash,
 )
 
@@ -260,7 +261,7 @@ def invite_owner(
 def acknowledge_agreement(
     propertyId: str,
     response: Response,
-    principal: Principal = Depends(require_user),
+    principal: Principal = Depends(require_user_unrotated),
     db: Session = Depends(get_db),
 ):
     prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
@@ -300,6 +301,10 @@ def acknowledge_agreement(
 
     db.commit()
     db.refresh(ack)
+    # Rotate on the success path only: a 403/404 cannot carry X-Refreshed-Token, so rotating earlier would strand the
+    # owner with a dead token.
+    user = db.query(User).filter(User.id == principal.user_id).one()
+    response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
     return ack
 
 
