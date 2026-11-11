@@ -46,6 +46,19 @@ cause and fix it once.
 - **Magic numbers and strings.** The same literal (`200`, `"pending_acknowledgement"`, `"institution_user"`) repeated
   in several files. Name it once.
 - **Null as a hidden mode.** `None` means "do the default thing" in one place and "missing" in another.
+- **Non-planar database layout.** A layout is planar when its entity-relationship graph (tables as nodes, foreign
+  keys as edges) can be drawn on a flat page with no crossing lines. A non-planar one cannot, which is a sign of a
+  tangled schema: a hub table that everything references, a shortcut link that repeats a path that already exists
+  (A references B, B references C, and A also references C), circular foreign keys, or a many-to-many knot between
+  several tables. It hurts because there are two ways to get from A to C that can disagree, cascade deletes surprise
+  you, the diagram is hard to explain, a change ripples through many tables, and a redundant link can contradict the
+  long way round. Prefer a tree or layered layout: model each fact once and hang details off their owner, break a
+  hub by splitting its roles, replace a redundant shortcut with a derived query or a view, make a many-to-many an
+  explicit join table with its own meaning, and give every relationship one owner direction so there are no cycles.
+  - How to check: export the table and foreign-key list (from the models or the database), build the graph, and run a
+    planarity test (a standard graph algorithm; `networkx.check_planarity` does it, and with `counterexample=True` it
+    returns the tangled subgraph). A quick necessary check first: a simple planar graph with V >= 3 tables has at
+    most 3V - 6 edges, so more than that is non-planar for certain. Passing the edge bound proves nothing.
 
 ## Behavior and control flow
 
@@ -138,6 +151,10 @@ Low priority (parked):
 | Unreachable "institution id is None" check in `create_institution` and the unreachable 404 in revoke | Dead code with no effect; remove when next touching those functions. |
 | Stale comment at `app/api/routes/auth.py:377` | Misleading comment only. |
 | Comma-separated lists | Checked 2026-11-10: no id lists anywhere in the API, schema or UI. The only comma-separated value is the `CORS_ALLOW_ORIGINS` environment variable, which is configuration. Keep out of new APIs; no action now. |
+
+Process rule (apply to every new migration; no present harm, so not in either table):
+
+- Non-planar database layout. Before merging a migration that adds a table or foreign key, check that the new link does not duplicate an existing path or add a cycle; run the planarity check when a table has more than a few links.
 
 Resolved:
 
