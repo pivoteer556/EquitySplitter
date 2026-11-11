@@ -179,7 +179,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "CORS_ALLOW_ORIGINS"
-        value = "https://${azurerm_static_web_app.web.default_host_name}"
+        value = "https://${azurerm_static_web_app.web.default_host_name},https://${var.custom_domain}"
       }
       env {
         name        = "DATABASE_URL"
@@ -218,4 +218,13 @@ resource "azurerm_static_web_app" "web" {
   sku_tier            = "Free"
   sku_size            = "Free"
   tags                = var.tags
+}
+
+# Custom domain on the Static Web App (free managed certificate). An apex domain only supports
+# TXT validation, which the provider does not wait for: apply creates the resource and the token,
+# then the user adds the TXT and ALIAS/CNAME records in DNS. See infra/CUSTOM_DOMAIN.md.
+resource "azurerm_static_web_app_custom_domain" "web" {
+  static_web_app_id = azurerm_static_web_app.web.id
+  domain_name       = var.custom_domain
+  validation_type   = "dns-txt-token"
 }

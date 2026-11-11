@@ -59,3 +59,13 @@ output "bootstrap_token" {
   value     = random_password.bootstrap_token.result
   sensitive = true
 }
+
+# DNS records to create for the custom domain (see infra/CUSTOM_DOMAIN.md). The token is empty
+# once Azure has validated the domain.
+output "custom_domain_txt_token" {
+  value = azurerm_static_web_app_custom_domain.web.validation_token
+}
+
+output "custom_domain_cname_target" {
+  value = azurerm_static_web_app.web.default_host_name
+}

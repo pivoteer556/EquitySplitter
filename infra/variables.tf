@@ -122,3 +122,9 @@ variable "trusted_proxy_hops" {
   type        = number
   default     = 1
 }
+
+variable "custom_domain" {
+  description = "Apex domain served by the Static Web App; also added to the API's CORS origins. See CUSTOM_DOMAIN.md."
+  type        = string
+  default     = "equitysplitter.app"
+}
