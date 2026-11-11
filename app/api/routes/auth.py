@@ -4,15 +4,16 @@ from datetime import UTC, datetime
 from typing import NoReturn
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import (
     Principal,
     platform_admin_principal,
-    require_institution_user_unrotated,
-    rotate_session,
+    require_institution_user,
+    require_institution_user_no_rotation,
 )
+from app.api.route import RotatingRoute
 from app.api.routes.totp import TotpEnrollment
 from app.core.config import settings
 from app.db.session import get_db
@@ -54,7 +55,7 @@ from app.services.auth import (
 )
 from app.services.rate_limit import RateLimiter, login_limiter, signup_limiter
 
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", route_class=RotatingRoute)
 
 ENROLMENT_PURPOSE = "enrolment_challenge"  # token purpose; see issue_login_challenge_token
 
@@ -104,7 +105,6 @@ def _enforce_signup_limit(db: Session, request: Request, scope: str = "signup") 
 def institution_bootstrap(
     payload: InstitutionBootstrapRequest,
     request: Request,
-    response: Response,
     db: Session = Depends(get_db),
     x_bootstrap_token: str | None = Header(default=None),
 ):
@@ -119,7 +119,7 @@ def institution_bootstrap(
     # kind) is the same 404 as a bad setup token. Checked after the token so only token holders touch sessions.
     try:
         # Authorization is read from the request (not a parameter) to stay within the argument-count lint.
-        platform_admin_principal(response, db, request.headers.get("authorization"))
+        platform_admin_principal(request, db, request.headers.get("authorization"))
     except (HTTPException, ValueError, KeyError):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from None
     institution, officer, token = bootstrap_institution(
@@ -342,7 +342,7 @@ def institution_activate(payload: AcceptInviteRequest, request: Request, db: Ses
 @router.post("/institution/revoke", status_code=status.HTTP_204_NO_CONTENT)
 def institution_revoke(
     payload: InstitutionRevokeRequest,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user_no_rotation),
     db: Session = Depends(get_db),
 ):
     # Never rotates: self-revoke kills the caller's token anyway, and a rejection must leave it usable.
@@ -365,8 +365,7 @@ def institution_revoke(
 def regenerate_recovery_codes(
     payload: RecoveryCodesRequest,
     request: Request,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     """Replace the signed-in officer's recovery codes. Needs a current authenticator code (a recovery code does not
@@ -394,5 +393,4 @@ def regenerate_recovery_codes(
     db.query(RecoveryCode).filter(RecoveryCode.institutionUserId == officer.id).delete(synchronize_session=False)
     db.add_all(RecoveryCode(institutionUserId=officer.id, codeHash=totp.hash_recovery_code(c)) for c in codes)
     db.commit()
-    rotate_session(db, principal, response)
     return RecoveryCodesResponse(recoveryCodes=codes)

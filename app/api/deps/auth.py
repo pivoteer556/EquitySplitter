@@ -1,7 +1,15 @@
+"""Authentication dependencies.
+
+Session rotation lives in ONE place, not here and not in handlers: the dependencies below authenticate and, unless
+they are a *_no_rotation variant, record on request.state that the caller's stored session token is due for
+rotation. RotatingRoute (app/api/route.py) performs it after the response is produced, only when the status is
+below 400, so a rejected request never strands the caller with a dead token and handlers contain no rotation code.
+"""
+
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException, Response, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -10,8 +18,6 @@ from app.services.auth import (
     decode_token,
     ensure_institution_not_revoked,
     ensure_user_property_scope,
-    refresh_and_store_institution_token,
-    refresh_and_store_user_token,
     validate_active_token_iat,
 )
 
@@ -23,33 +29,21 @@ class Principal:
     institution_id: UUID | None = None
 
 
+PENDING_ROTATION = "pending_rotation"  # request.state attribute: the Principal whose session RotatingRoute rotates
+
+
+def _record_rotation(request: Request, principal: Principal) -> Principal:
+    setattr(request.state, PENDING_ROTATION, principal)
+    return principal
+
+
 def _extract_bearer(authorization: str | None) -> str:
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
     return authorization.split(" ", 1)[1].strip()
 
 
-def require_user(
-    response: Response,
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> Principal:
-    claims = decode_token(db, _extract_bearer(authorization))
-    return _user_principal(response, db, claims)
-
-
-def require_user_unrotated(
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> Principal:
-    """Like require_user but leaves the stored session token alone. For endpoints that can reject the caller AFTER
-    authentication (404/409/422): those responses cannot carry X-Refreshed-Token, so rotating first would strand the
-    caller with a dead token. Such an endpoint rotates itself, after success, with rotate_session."""
-    claims = decode_token(db, _extract_bearer(authorization))
-    return _user_principal(None, db, claims)
-
-
-def _user_principal(response: Response | None, db: Session, claims: dict) -> Principal:
+def _user_principal(db: Session, claims: dict) -> Principal:
     if claims.get("userType") != "user":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
 
@@ -59,46 +53,10 @@ def _user_principal(response: Response | None, db: Session, claims: dict) -> Pri
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     validate_active_token_iat(user.lastTokenIssuedAt, claims.get("iat"))
-    if response is not None:
-        response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
     return Principal(user_id=user.id, user_type="user")
 
 
-def platform_admin_principal(response: Response, db: Session, authorization: str | None) -> Principal:
-    """A signed-in platform admin (a "user" session whose account has isPlatformAdmin). Raises HTTPException on any
-    failure; callers that must not leak why (bootstrap) map every failure to one response. The admin flag is checked
-    BEFORE the session token is rotated, so a rejected caller never has their stored session replaced."""
-    claims = decode_token(db, _extract_bearer(authorization))
-    if claims.get("userType") != "user":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
-    user = db.query(User).filter(User.id == UUID(claims["sub"])).first()
-    if user is None or not user.isPlatformAdmin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a platform admin")
-    return _user_principal(response, db, claims)
-
-
-def require_institution_user(
-    response: Response,
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> Principal:
-    claims = decode_token(db, _extract_bearer(authorization))
-    return _institution_principal(response, db, claims)
-
-
-def require_institution_user_unrotated(
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> Principal:
-    """Like require_institution_user but leaves the stored session token alone. For endpoints that can reject the
-    caller AFTER authentication (a wrong TOTP code): a 401 cannot carry X-Refreshed-Token, so rotating first would
-    strand the caller with a dead token. Such an endpoint rotates itself, after success, with
-    rotate_session."""
-    claims = decode_token(db, _extract_bearer(authorization))
-    return _institution_principal(None, db, claims)
-
-
-def _institution_principal(response: Response | None, db: Session, claims: dict) -> Principal:
+def _institution_principal(db: Session, claims: dict) -> Principal:
     if claims.get("userType") != "institution_user":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
 
@@ -109,44 +67,60 @@ def _institution_principal(response: Response | None, db: Session, claims: dict)
 
     ensure_institution_not_revoked(db, inst_user.id)
     validate_active_token_iat(inst_user.lastTokenIssuedAt, claims.get("iat"))
-    if response is not None:
-        response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, inst_user)
     return Principal(user_id=inst_user.id, user_type="institution_user", institution_id=inst_user.institutionId)
 
 
+def require_user(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    claims = decode_token(db, _extract_bearer(authorization))
+    return _record_rotation(request, _user_principal(db, claims))
+
+
+def require_institution_user(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    claims = decode_token(db, _extract_bearer(authorization))
+    return _record_rotation(request, _institution_principal(db, claims))
+
+
+def require_institution_user_no_rotation(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Authenticates an officer but never rotates the session. The visible opt-out, for revoke: a self-revoke kills
+    the caller's token, so a refreshed one would be dead on arrival."""
+    claims = decode_token(db, _extract_bearer(authorization))
+    return _institution_principal(db, claims)
+
+
 def require_user_or_institution_user(
-    response: Response,
+    request: Request,
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> Principal:
-    """Accept either identity type; any other userType (e.g. invite) gets the usual 403 from require_user."""
+    """Accept either identity type; any other userType (e.g. invite) gets the usual 403 from _user_principal."""
     claims = decode_token(db, _extract_bearer(authorization))
     if claims.get("userType") == "institution_user":
-        return _institution_principal(response, db, claims)
-    return _user_principal(response, db, claims)
+        return _record_rotation(request, _institution_principal(db, claims))
+    return _record_rotation(request, _user_principal(db, claims))
 
 
-def rotate_session(db: Session, principal: Principal, response: Response) -> None:
-    """Rotate the caller's stored session token and hand the new one back in X-Refreshed-Token. Endpoints that use an
-    *_unrotated dependency call this only after they succeeded (a 4xx cannot carry the header)."""
-    if principal.user_type == "institution_user":
-        officer = db.query(InstitutionUser).filter(InstitutionUser.id == principal.user_id).one()
-        response.headers["X-Refreshed-Token"] = refresh_and_store_institution_token(db, officer)
-    else:
-        user = db.query(User).filter(User.id == principal.user_id).one()
-        response.headers["X-Refreshed-Token"] = refresh_and_store_user_token(db, user)
-
-
-def require_user_or_institution_user_unrotated(
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> Principal:
-    """Like require_user_or_institution_user but leaves the stored session token alone. The endpoint rotates itself,
-    after success, with rotate_session."""
+def platform_admin_principal(request: Request, db: Session, authorization: str | None) -> Principal:
+    """A signed-in platform admin (a "user" session whose account has isPlatformAdmin). Raises HTTPException on any
+    failure; callers that must not leak why (bootstrap) map every failure to one response. Records the admin's
+    session for rotation like the other dependencies, so a rejected caller never has their stored session replaced."""
     claims = decode_token(db, _extract_bearer(authorization))
-    if claims.get("userType") == "institution_user":
-        return _institution_principal(None, db, claims)
-    return _user_principal(None, db, claims)
+    if claims.get("userType") != "user":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Wrong identity type for endpoint")
+    user = db.query(User).filter(User.id == UUID(claims["sub"])).first()
+    if user is None or not user.isPlatformAdmin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a platform admin")
+    return _record_rotation(request, _user_principal(db, claims))
 
 
 def require_user_property_scope(

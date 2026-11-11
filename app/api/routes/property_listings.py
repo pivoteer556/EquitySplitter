@@ -1,11 +1,12 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_institution_user_unrotated, rotate_session
+from app.api.deps.auth import Principal, require_institution_user
+from app.api.route import RotatingRoute
 from app.api.routes.equity_splitter import _readable_property
 from app.db.session import get_db
 from app.models import PropertyListing
@@ -17,7 +18,7 @@ from app.schemas.property_listing import (
     PropertyListingUpdate,
 )
 
-router = APIRouter()
+router = APIRouter(route_class=RotatingRoute)
 
 
 @router.post(
@@ -26,8 +27,7 @@ router = APIRouter()
 def create_listing(
     property_id: str,
     payload: PropertyListingCreate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, property_id)  # another institution's property looks nonexistent
@@ -35,15 +35,13 @@ def create_listing(
     db.add(listing)
     db.commit()
     db.refresh(listing)
-    rotate_session(db, principal, response)
     return listing
 
 
 @router.get("/properties/{property_id}/listings", response_model=list[PropertyListingRead])
 def list_listings(
     property_id: str,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, property_id)
@@ -53,7 +51,6 @@ def list_listings(
         .order_by(PropertyListing.createdAt.desc(), PropertyListing.id)
         .all()
     )
-    rotate_session(db, principal, response)
     return listings
 
 
@@ -102,8 +99,7 @@ def _apply_transition(db: Session, listing: PropertyListing, to: str) -> None:
 def transition_listing(
     listing_id: str,
     payload: PropertyListingTransition,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     listing = _own_listing(db, principal, listing_id)
@@ -114,7 +110,6 @@ def transition_listing(
         db.rollback()
         raise HTTPException(status_code=409, detail=_ALREADY_LISTED) from None
     db.refresh(listing)
-    rotate_session(db, principal, response)
     return listing
 
 
@@ -122,8 +117,7 @@ def transition_listing(
 def update_listing(
     listing_id: str,
     payload: PropertyListingUpdate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     listing = _own_listing(db, principal, listing_id)
@@ -133,5 +127,4 @@ def update_listing(
         setattr(listing, field, value)
     db.commit()
     db.refresh(listing)
-    rotate_session(db, principal, response)
     return listing

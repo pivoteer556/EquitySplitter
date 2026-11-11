@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps.auth import (
     Principal,
-    require_user_or_institution_user_unrotated,
-    require_user_unrotated,
-    rotate_session,
+    require_user,
+    require_user_or_institution_user,
 )
+from app.api.route import RotatingRoute
 from app.db.session import get_db
 from app.models import ConnectionRequest, InstitutionUser, Property, User, UserProperty
 from app.schemas.connection_request import (
@@ -17,7 +17,7 @@ from app.schemas.connection_request import (
 )
 from app.schemas.institution import PROFESSIONAL_ROLES
 
-router = APIRouter()
+router = APIRouter(route_class=RotatingRoute)
 
 _ORDER = (ConnectionRequest.createdAt.desc(), ConnectionRequest.id)
 
@@ -46,8 +46,7 @@ def _check_targets(db: Session, buyer_id, payload: ConnectionRequestCreate) -> N
 @router.post("/connection-requests", response_model=ConnectionRequestRead, status_code=status.HTTP_201_CREATED)
 def create_connection_request(
     payload: ConnectionRequestCreate,
-    response: Response,
-    principal: Principal = Depends(require_user_unrotated),
+    principal: Principal = Depends(require_user),
     db: Session = Depends(get_db),
 ):
     _check_targets(db, principal.user_id, payload)
@@ -59,9 +58,6 @@ def create_connection_request(
         db.rollback()
         raise HTTPException(status_code=409, detail="Connection already requested") from None
     db.refresh(request)
-    # Rotate only now: a rejection above (404/409/422) cannot carry X-Refreshed-Token, so rotating earlier would
-    # strand the buyer with a dead token.
-    rotate_session(db, principal, response)
     return request
 
 
@@ -81,19 +77,14 @@ def _incoming(db: Session, professional_id, limit: int, offset: int) -> list[Inc
 
 @router.get("/connection-requests", response_model=list[IncomingConnectionRequestRead] | list[ConnectionRequestRead])
 def list_connection_requests(
-    response: Response,
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    principal: Principal = Depends(require_user_or_institution_user_unrotated),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
-    # The unrotated dependency leaves the session alone so a 422 on limit/offset cannot strand the caller; rotate
-    # here, on the success path only.
     if principal.user_type == "institution_user":
         result = _incoming(db, principal.user_id, limit, offset)
-        rotate_session(db, principal, response)
         return result
     query = db.query(ConnectionRequest).filter(ConnectionRequest.buyerId == principal.user_id)
     rows = query.order_by(*_ORDER).limit(limit).offset(offset).all()
-    rotate_session(db, principal, response)
     return rows

@@ -6,12 +6,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps.auth import (
     Principal,
-    require_institution_user_unrotated,
-    require_user_or_institution_user_unrotated,
+    require_institution_user,
+    require_user,
+    require_user_or_institution_user,
     require_user_property_scope,
-    require_user_unrotated,
-    rotate_session,
 )
+from app.api.route import RotatingRoute
 from app.db.session import get_db
 from app.models import (
     Institution,
@@ -50,14 +50,13 @@ from app.services.auth import (
     unusable_password_hash,
 )
 
-router = APIRouter()
+router = APIRouter(route_class=RotatingRoute)
 
 
 @router.post("/institutions", response_model=InstitutionRead, status_code=status.HTTP_201_CREATED)
 def create_institution(
     payload: InstitutionCreate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     if principal.institution_id is None:
@@ -66,17 +65,13 @@ def create_institution(
     db.add(institution)
     db.commit()
     db.refresh(institution)
-    # Rotate on the success path only: a 403/422 cannot carry X-Refreshed-Token, so rotating earlier would strand the
-    # officer with a dead token.
-    rotate_session(db, principal, response)
     return institution
 
 
 @router.post("/institution-users", response_model=InstitutionUserCreated, status_code=status.HTTP_201_CREATED)
 def create_institution_user(
     payload: InstitutionUserCreate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     if principal.institution_id != payload.institutionId:
@@ -86,20 +81,16 @@ def create_institution_user(
     db.commit()
     db.refresh(inst_user)
     token = issue_institution_invite_token(db, inst_user.id)
-    # Rotate on the success path only: a 403/422 cannot carry X-Refreshed-Token, so rotating earlier would strand the
-    # officer with a dead token.
-    rotate_session(db, principal, response)
     read = InstitutionUserRead.model_validate(inst_user)
     return InstitutionUserCreated(**read.model_dump(), activationToken=token, activationPath=f"/activate#token={token}")
 
 
 @router.get("/professionals", response_model=list[ProfessionalRead])
-def list_professionals(  # noqa: PLR0913 - role, paging, response, principal and db are all needed
-    response: Response,
+def list_professionals(
     role: ProfessionalRole | None = None,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    principal: Principal = Depends(require_user_or_institution_user_unrotated),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
     inst_name = Institution.name.label("institutionName")
@@ -110,8 +101,6 @@ def list_professionals(  # noqa: PLR0913 - role, paging, response, principal and
         .filter(InstitutionUser.role.in_([role] if role else PROFESSIONAL_ROLES))
     )
     rows = query.order_by(InstitutionUser.name, InstitutionUser.id).limit(limit).offset(offset).all()
-    # Rotate on the success path only: a 422 cannot carry X-Refreshed-Token.
-    rotate_session(db, principal, response)
     return [ProfessionalRead(**row._asdict()) for row in rows]
 
 
@@ -140,8 +129,7 @@ def _property_read(prop: Property) -> PropertyRead:
 @router.post("/properties", response_model=PropertyRead, status_code=status.HTTP_201_CREATED)
 def create_property(
     payload: PropertyCreate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     if principal.institution_id != payload.institutionId:
@@ -152,9 +140,6 @@ def create_property(
     db.add(prop)
     db.commit()
     db.refresh(prop)
-    # Rotate on the success path only: a 403/422 cannot carry X-Refreshed-Token, so rotating earlier would strand the
-    # officer with a dead token.
-    rotate_session(db, principal, response)
     return _property_read(prop)
 
 
@@ -164,8 +149,7 @@ def create_property(
 def attach_agreement(
     propertyId: str,
     payload: PropertyAgreementCreate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
@@ -184,9 +168,6 @@ def attach_agreement(
     db.add(agreement)
     db.commit()
     db.refresh(agreement)
-    # Rotate on the success path only: a 403/404/409/422 cannot carry X-Refreshed-Token, so rotating earlier would
-    # strand the officer with a dead token.
-    rotate_session(db, principal, response)
     return agreement
 
 
@@ -202,8 +183,7 @@ def _with_invite_token(db: Session, user: User, ack: OwnerAcknowledgement) -> Ow
 def invite_owner(
     propertyId: str,
     payload: OwnerInviteCreate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
@@ -244,9 +224,6 @@ def invite_owner(
     )
     if existing_ack is not None:
         result = _with_invite_token(db, user, existing_ack)
-        # Rotate on the success path only: a 400/403/404/422 cannot carry X-Refreshed-Token, so rotating earlier would
-        # strand the officer with a dead token.
-        rotate_session(db, principal, response)
         return result
 
     ack = OwnerAcknowledgement(agreementId=agreement.id, userPropertyId=user_property.id, signedAt=None)
@@ -254,17 +231,13 @@ def invite_owner(
     db.commit()
     db.refresh(ack)
     result = _with_invite_token(db, user, ack)
-    # Rotate on the success path only: a 400/403/404/422 cannot carry X-Refreshed-Token, so rotating earlier would
-    # strand the officer with a dead token.
-    rotate_session(db, principal, response)
     return result
 
 
 @router.post("/properties/{propertyId}/acknowledge", response_model=AcknowledgementRead)
 def acknowledge_agreement(
     propertyId: str,
-    response: Response,
-    principal: Principal = Depends(require_user_unrotated),
+    principal: Principal = Depends(require_user),
     db: Session = Depends(get_db),
 ):
     prop = db.query(Property).filter(Property.id == UUID(propertyId)).first()
@@ -304,9 +277,6 @@ def acknowledge_agreement(
 
     db.commit()
     db.refresh(ack)
-    # Rotate on the success path only: a 403/404 cannot carry X-Refreshed-Token, so rotating earlier would strand the
-    # owner with a dead token.
-    rotate_session(db, principal, response)
     return ack
 
 
@@ -322,18 +292,15 @@ def _visible_properties(db: Session, principal: Principal):
 
 @router.get("/properties", response_model=list[PropertyRead])
 def list_properties(
-    response: Response,
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    principal: Principal = Depends(require_user_or_institution_user_unrotated),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
     query = _visible_properties(db, principal).order_by(Property.createdAt.desc(), Property.id)
     # selectinload: one extra query for all loans on the page instead of one lazy load per property.
     rows = query.options(selectinload(Property.loan)).limit(limit).offset(offset).all()
-    result = [_property_read(p) for p in rows]  # before the rotation commit expires the rows (and re-queries loans)
-    # Rotate on the success path only: a 422 cannot carry X-Refreshed-Token.
-    rotate_session(db, principal, response)
+    result = [_property_read(p) for p in rows]
     return result
 
 
@@ -344,16 +311,13 @@ def _pending_listings(db: Session):
 
 @router.get("/listings", response_model=list[ListingRead])
 def list_listings(
-    response: Response,
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    principal: Principal = Depends(require_user_or_institution_user_unrotated),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
     rows = _pending_listings(db).order_by(Property.createdAt.desc(), Property.id).limit(limit).offset(offset).all()
-    result = [ListingRead.model_validate(p) for p in rows]  # before the rotation commit expires the rows
-    # Rotate on the success path only: a 422 cannot carry X-Refreshed-Token.
-    rotate_session(db, principal, response)
+    result = [ListingRead.model_validate(p) for p in rows]
     return result
 
 
@@ -377,16 +341,12 @@ def _readable_property(db: Session, principal: Principal, property_id: str) -> P
 @router.get("/properties/{propertyId}", response_model=PropertyDetailRead)
 def get_property(
     propertyId: str,
-    response: Response,
-    principal: Principal = Depends(require_user_or_institution_user_unrotated),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
-    # Rotate on the success path only: a 403/404 cannot carry X-Refreshed-Token, so rotating earlier would strand the
-    # caller with a dead token.
-    rotate_session(db, principal, response)
     return {
         "property": _property_read(prop).model_dump(),
         "agreement": PropertyAgreementRead.model_validate(agreement).model_dump() if agreement else None,
@@ -397,8 +357,7 @@ def get_property(
 def update_property(
     propertyId: str,
     payload: PropertyUpdate,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
@@ -416,17 +375,14 @@ def update_property(
                 setattr(prop.loan, field, changes[field])
     db.commit()
     db.refresh(prop)
-    result = _property_read(prop)  # before the rotation commit expires the row
-    # Rotate on the success path only: a 403/404/422 cannot carry X-Refreshed-Token.
-    rotate_session(db, principal, response)
+    result = _property_read(prop)
     return result
 
 
 @router.delete("/properties/{propertyId}", status_code=204)
 def delete_property(
     propertyId: str,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)  # other institutions' properties look nonexistent
@@ -434,26 +390,19 @@ def delete_property(
         raise HTTPException(status_code=403, detail="Property is active; setup writes are closed")
     db.delete(prop)  # ORM cascades remove agreement, loan, owner links and their acknowledgements; Users stay
     db.commit()
-    # Rotate on the success path only. The header goes on the Response we return: headers set on the injected
-    # `response` are dropped when a handler returns its own Response.
-    resp = Response(status_code=204)
-    rotate_session(db, principal, resp)
-    return resp
+    return Response(status_code=204)
 
 
 @router.get("/properties/{propertyId}/owners", response_model=PropertyOwnersRead)
 def list_owners(
     propertyId: str,
-    response: Response,
-    principal: Principal = Depends(require_user_or_institution_user_unrotated),
+    principal: Principal = Depends(require_user_or_institution_user),
     db: Session = Depends(get_db),
 ):
     prop = _readable_property(db, principal, propertyId)
 
     agreement = db.query(PropertyAgreement).filter(PropertyAgreement.propertyId == prop.id).first()
-    # Rotate on the success path only (both returns): a 403/404 cannot carry X-Refreshed-Token.
     if agreement is None:
-        rotate_session(db, principal, response)
         return {"owners": []}  # no agreement attached, so nobody can have been invited yet
 
     rows = (
@@ -480,5 +429,4 @@ def list_owners(
         )
         for up, u, ack in rows
     ]
-    rotate_session(db, principal, response)
     return {"owners": owners}

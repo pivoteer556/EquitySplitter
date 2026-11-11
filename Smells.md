@@ -123,7 +123,6 @@ High priority:
 
 | Smell | Why high |
 |---|---|
-| Session-token rotation is a per-endpoint call (`rotate_session` in about 20 handlers, plus dead rotating dependencies) | Multiplies (every new endpoint must remember it), touches sessions, and the dead dependencies bring the original bug back if used. Fix: rotate once, in a route-level wrapper. |
 | Malformed ids give 404, 422 or 500 depending on the route (`attach_agreement`, `invite_owner`, `acknowledge_agreement` still 500) | A 500 on bad input, and an inconsistent API contract that is cheap to settle now. |
 | A missing property is a 404 for an officer of another institution but a 403 for an unlinked buyer | Two answers for the same case; the 403 tells a buyer that the property exists. Settle one rule in one lookup helper. |
 | Duplicate officer email on `POST /institution-users` is an unhandled `IntegrityError` (500), while `register` and `bootstrap_institution` return 409 | A 500 for a real request, and inconsistent with the sibling routes. Small fix. |
@@ -133,12 +132,16 @@ Low priority (parked):
 
 | Smell | Why low |
 |---|---|
-| Extra queries after rotation on two older list endpoints (`property_listings.list_listings`, the buyer connection-requests list) | Performance only, same data. It goes away with the route-level rotation, so do not fix it separately. |
 | `# noqa: PLR0913` on `list_professionals` (limit and offset repeated on list routes) | Contained, cosmetic. A shared paging dependency is a tidy-up, not urgent. |
-| Copied e2e preambles, repeated 1100 ms waits and repeated rotation test helpers | Test-only. Folds into the route-level rotation work: one parametrized test replaces the per-endpoint files. |
+| Copied e2e preambles, repeated 1100 ms waits and repeated rotation test helpers | Test-only. The route-level rotation work (done 2026-11-10) added one shared test file, `tests/test_session_rotation_by_default.py`; the older per-endpoint rotation test files remain and could now be folded into it. |
 | Unreachable "institution id is None" check in `create_institution` and the unreachable 404 in revoke | Dead code with no effect; remove when next touching those functions. |
 | Stale comment at `app/api/routes/auth.py:377` | Misleading comment only. |
 | Comma-separated lists | Checked 2026-11-10: no id lists anywhere in the API, schema or UI. The only comma-separated value is the `CORS_ALLOW_ORIGINS` environment variable, which is configuration. Keep out of new APIs; no action now. |
+
+Resolved:
+
+- 2026-11-10, session-token rotation as a per-endpoint call (`rotate_session` in about 20 handlers, plus dead rotating dependencies). Fixed by moving rotation into one place: `RotatingRoute` (`app/api/route.py`) rotates after the response, only below status 400, and the handlers carry no rotation code. `rotate_session`, the `*_unrotated` dependencies and the dead rotating dependencies are gone; a test enforces that every router uses `RotatingRoute`.
+- 2026-11-10, extra queries after rotation on two older list endpoints (`property_listings.list_listings`, the buyer connection-requests list). Resolved by the same change: the cause was rotating (and committing) inside the handler before serialization, and that no longer happens.
 
 Test smells already handled or tracked:
 

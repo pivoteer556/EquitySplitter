@@ -1,17 +1,18 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.api.deps.auth import Principal, require_institution_user_unrotated, rotate_session
+from app.api.deps.auth import Principal, require_institution_user
+from app.api.route import RotatingRoute
 from app.db.session import get_db
 from app.models import InstitutionUser, TotpCredential
 from app.services import auth as auth_service
 from app.services import totp
 from app.services.rate_limit import login_limiter
 
-router = APIRouter(prefix="/auth/institution/totp")
+router = APIRouter(prefix="/auth/institution/totp", route_class=RotatingRoute)
 
 
 class TotpEnrollment(BaseModel):
@@ -29,8 +30,7 @@ def _credential(db: Session, user_id) -> TotpCredential | None:
 
 @router.post("/enroll", response_model=TotpEnrollment)
 def enroll(
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     """Start (or restart, until confirmed) enrolment. The secret is returned once, here, and never again.
@@ -48,15 +48,13 @@ def enroll(
     else:
         credential.secretEncrypted = totp.encrypt_secret(secret)
     db.commit()
-    rotate_session(db, principal, response)
     return TotpEnrollment(secret=secret, otpauthUri=totp.provisioning_uri(secret, officer.email))
 
 
 @router.post("/confirm", status_code=status.HTTP_204_NO_CONTENT)
 def confirm(
     payload: TotpConfirm,
-    response: Response,
-    principal: Principal = Depends(require_institution_user_unrotated),
+    principal: Principal = Depends(require_institution_user),
     db: Session = Depends(get_db),
 ):
     """Rotate the session token only after the code is accepted: 400/409/429 cannot carry X-Refreshed-Token."""
@@ -83,5 +81,4 @@ def confirm(
     credential.confirmedAt = datetime.now(UTC)
     credential.lastUsedStep = step
     db.commit()
-    rotate_session(db, principal, response)
     return None
