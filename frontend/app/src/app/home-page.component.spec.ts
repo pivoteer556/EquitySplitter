@@ -5,7 +5,7 @@ import { of, throwError } from 'rxjs';
 
 import { ApiService } from './api.service';
 import { HomePageComponent } from './home-page.component';
-import { Property, PropertyDetailResponse, PropertyOwnersResponse } from './models';
+import { Property, PropertyDetailResponse, PropertyOwnersResponse, PropertyPurchase } from './models';
 
 const property = (id: string, address: string): Property => ({
   id,
@@ -43,13 +43,13 @@ const owners: PropertyOwnersResponse = {
 };
 
 describe('HomePageComponent', () => {
-  function setup(opts: { properties?: Property[]; failWith?: Partial<HttpErrorResponse> } = {}) {
+  function setup(opts: { properties?: Property[]; failWith?: Partial<HttpErrorResponse>; purchase?: Partial<PropertyPurchase> } = {}) {
     const properties = opts.properties ?? [property('p-1', '12 Maple Lane')];
     const api = {
       getProperties: jasmine.createSpy('getProperties').and.returnValue(
         opts.failWith ? throwError(() => opts.failWith) : of(properties),
       ),
-      getProperty: jasmine.createSpy('getProperty').and.returnValue(of(detail)),
+      getProperty: jasmine.createSpy('getProperty').and.returnValue(of({ ...detail, purchase: { ...detail.purchase, ...opts.purchase } })),
       getOwners: jasmine.createSpy('getOwners').and.returnValue(of(owners)),
     };
     TestBed.configureTestingModule({ providers: [{ provide: ApiService, useValue: api }, provideRouter([])] });
@@ -69,7 +69,6 @@ describe('HomePageComponent', () => {
     expect(text).toContain('2.5 bathrooms');
     expect(text).toContain('2,140 sq ft');
     expect(text).toContain('Sunny corner lot.');
-    expect(text).toContain('intent_to_proceed');
 
     const ownerRows = root.querySelectorAll('table.owners tbody tr');
     expect(ownerRows.length).toBe(2);
@@ -115,5 +114,40 @@ describe('HomePageComponent', () => {
     buttons[1].click();
     fixture.detectChanges();
     expect(api.getProperty).toHaveBeenCalledWith('p-2', 'user');
+  });
+
+  describe('stage statement', () => {
+    const TITLE_SENTENCE = "Shown as the buyers of this home in EquitySplitter's records. This is not a record of legal title.";
+    const statement = (root: HTMLElement) => (root.querySelector('.stage') as HTMLElement).textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+    it('listed: says it is not yet an application and makes no ownership claim', () => {
+      const { root } = setup({ purchase: { stage: 'listed' } });
+      expect(statement(root)).toBe('Not yet an application.');
+      expect(root.textContent).not.toContain('legal title');
+      expect(root.textContent).not.toContain('intent_to_proceed');
+    });
+
+    it('application_filed: gives the filing date, no ownership claim, owners shown as applicants', () => {
+      const { root } = setup({ purchase: { stage: 'application_filed', applicationFiledAt: '2026-10-20T00:00:00Z' } });
+      expect(statement(root)).toBe('Application filed on October 20, 2026.');
+      expect(root.textContent).not.toContain('legal title');
+      expect(root.querySelector('#home-owners')?.textContent).toContain('Applicants');
+    });
+
+    it('intent_to_proceed: gives both dates and the legal-title sentence', () => {
+      const { root } = setup({ purchase: { stage: 'intent_to_proceed', intentToProceedAt: '2026-11-05T00:00:00Z', closingDate: '2026-12-18' } });
+      expect(statement(root)).toBe('Intent to proceed on November 5, 2026; closing planned December 18, 2026. ' + TITLE_SENTENCE);
+      expect(root.querySelector('#home-owners')?.textContent).toContain('Owners');
+    });
+
+    it('closed: gives the closing date and the legal-title sentence', () => {
+      const { root } = setup({ purchase: { stage: 'closed', closedAt: '2026-12-18T00:00:00Z' } });
+      expect(statement(root)).toBe('Closed on December 18, 2026. ' + TITLE_SENTENCE);
+    });
+
+    it('tolerates a missing date', () => {
+      const { root } = setup({ purchase: { stage: 'intent_to_proceed', intentToProceedAt: null, closingDate: null } });
+      expect(statement(root)).toBe('Intent to proceed; closing date not set. ' + TITLE_SENTENCE);
+    });
   });
 });

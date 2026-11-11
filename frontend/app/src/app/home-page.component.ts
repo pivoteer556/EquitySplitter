@@ -9,7 +9,7 @@ import { HouseIllustrationComponent } from './house-illustration.component';
 import { Property, PropertyDetailResponse, PropertyOwnerStatus } from './models';
 
 // The owner's "my home" page (docs/design/vertical-slice.md section 5). Reads only: GET /properties, then the detail
-// and owners of the chosen property, all signed with the buyer's token. The stage is shown raw; its wording is S6.
+// and owners of the chosen property, all signed with the buyer's token. The stage statement is plain language, one case per stage (S6).
 @Component({
   selector: 'app-home-page',
   imports: [CurrencyPipe, DatePipe, DecimalPipe, RouterLink, HouseIllustrationComponent],

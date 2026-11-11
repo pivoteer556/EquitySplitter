@@ -33,13 +33,32 @@
           <p>{{ l.description }}</p>
         }
       }
-      <p>Stage: <strong>{{ d.purchase.stage }}</strong></p>
+      <!-- Plain-language stage (docs/design/vertical-slice.md, "Stages for the slice"). Only the last two stages make the
+           "shown as the buyers" claim, and then say it is not legal title. -->
+      <p class="stage">
+        @switch (d.purchase.stage) {
+          @case ('application_filed') {
+            <strong>Application filed{{ d.purchase.applicationFiledAt ? ' on ' + (d.purchase.applicationFiledAt | date: 'longDate' : 'UTC') : '' }}.</strong>
+          }
+          @case ('intent_to_proceed') {
+            <strong>Intent to proceed{{ d.purchase.intentToProceedAt ? ' on ' + (d.purchase.intentToProceedAt | date: 'longDate' : 'UTC') : '' }}; closing {{ d.purchase.closingDate ? 'planned ' + (d.purchase.closingDate | date: 'longDate') : 'date not set' }}.</strong>
+            Shown as the buyers of this home in EquitySplitter's records. This is not a record of legal title.
+          }
+          @case ('closed') {
+            <strong>Closed{{ d.purchase.closedAt ? ' on ' + (d.purchase.closedAt | date: 'longDate' : 'UTC') : '' }}.</strong>
+            Shown as the buyers of this home in EquitySplitter's records. This is not a record of legal title.
+          }
+          @default {
+            <strong>Not yet an application.</strong>
+          }
+        }
+      </p>
     </section>
 
     <section aria-labelledby="home-owners">
-      <h2 id="home-owners">Owners</h2>
+      <h2 id="home-owners">{{ d.purchase.stage === 'application_filed' ? 'Applicants' : 'Owners' }}</h2>
       <table class="owners">
-        <caption>Owners of this home, their down payments and shares</caption>
+        <caption>{{ d.purchase.stage === 'application_filed' ? 'Applicants for this home' : 'Owners of this home' }}, their down payments and shares</caption>
         <thead>
           <tr>
             <th scope="col">Name</th>
