@@ -26,6 +26,12 @@ cause and fix it once.
      which misses reordered or reformatted copies.
    - A hit means the code deserves a look, not a fix. Guard clauses on different data, and conditions that only look
      alike, are fine.
+   - Do not simply extract the condition into a helper. That is the cosmetic fix and it leaves the real smell in place.
+     Look at the functions (or workflow jobs and steps) around each copy: a condition that keeps recurring usually means
+     those surrounding functions are redundant variants of one another, doing the same job on a different case. Decide
+     whether they should be merged into one function that takes the varying part as an input, or split along the
+     condition (it is a hidden mode or type). Extract a predicate only once the surrounding functions are known to be
+     genuinely different.
 
 ## Data and interfaces
 
