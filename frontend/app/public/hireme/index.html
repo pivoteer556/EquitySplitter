@@ -162,7 +162,7 @@ h2.section {
 
   <aside class="rail">
     <h1 class="name">Alex Wilkening</h1>
-    <p class="role-line">Full-stack engineer in Minneapolis, Minnesota</p>
+    <p class="role-line">Full-stack engineer and freelancer in Minneapolis, Minnesota</p>
 
     <nav aria-label="Career views">
       <p class="lens-title" id="lens-label">Explore my career by</p>
@@ -192,10 +192,30 @@ h2.section {
       <li data-tags="delivery domains"><span class="fig">23 days</span><span class="cap">from kickoff to broad release for a three-party UAD appraisal integration, with no end-user bugs reported in pilot</span></li>
       <li data-tags="ai-agents"><span class="fig">99.74%</span><span class="cap">accuracy on an LLM extraction task across diverse real-world datasets</span></li>
       <li data-tags="delivery platform"><span class="fig">Net-negative</span><span class="cap">line count across seven months of routine frontend work that also tripled the app’s functionality and removed dozens of bugs</span></li>
+      <li data-tags="ai-agents delivery"><span class="fig">11 of 11</span><span class="cap">first-client change requests live in one delivery, each with a written way to check it, and a tool that lets the owner request the next ones himself</span></li>
       <li data-tags="ai-agents platform"><span class="fig">5 to 260+ tests</span><span class="cap">added to a personal API by a build-and-review agent workflow, alongside argon2id hashing and CI that blocks known CVEs</span></li>
     </ul>
 
     <h2 class="section">Career</h2>
+
+    <article class="role">
+      <p class="when">Nov 2026 – present</p>
+      <div>
+        <h3>Zoom Twin Cities Music School</h3>
+        <p class="what">Freelance full stack engineer, remote (my first freelance client)</p>
+        <ul>
+          <li data-tags="delivery domains">Rebuilt the school’s website as a fast, zero-dependency static site on Azure Static Web Apps, and delivered the owner’s first eleven change requests in a running delivery record that says what changed, its status, and how to check it. All eleven reached the live site on 2026-11-20.</li>
+          <li data-tags="domains">Replaced a vague travel policy with a rule the site enforces: no fee within 10 miles of the Minneapolis city limits, $15 per lesson to 20 miles, nothing beyond. A visitor’s browser looks up their address and measures the distance, so the address never reaches the school’s server and is never stored.</li>
+          <li data-tags="domains platform">Added a careers page with resume upload and a contact form that sends through a small email API instead of opening the visitor’s mail app, with a spam trap, size limits, and a fallback if a send fails. Kept the API warm for about $6 a month after the owner approved the cost.</li>
+          <li data-tags="delivery">Wrote a consistency audit that reads every built page and checks each stated price, hour, distance and policy against a single source of truth, so a changed fact fails the build wherever the old one remains. Each new rule was shown to catch a planted error before it was trusted.</li>
+          <li data-tags="ai-agents delivery">Built a website feedback tool for the owner, on the test site only: sign in with Google, type a change in plain language (screenshots allowed), and a Claude agent edits the site, runs the tests, and deploys to staging. The owner approves changes one at a time before they reach the live site.</li>
+          <li data-tags="ai-agents platform">Put guardrails around that agent: only approved addresses can submit; it cannot touch the tool itself, the workflows, the infrastructure or the dependencies; pictures are re-checked by their real bytes and ignored as instructions; photos for the site require a recorded confirmation of parental permission, enforced on the server; and if a request lacks information it changes nothing and emails the sender exactly what is missing.</li>
+          <li data-tags="domains platform">Billed the owner per change, at twice the agent’s metered cost, through Stripe Checkout. Payment is confirmed only by Stripe’s signed webhook, with the timestamp and amount verified. A double click returns the same session, a mismatched or duplicate payment alerts the studio, and the server refuses new requests above a $50 unpaid balance.</li>
+          <li data-tags="platform delivery">Kept the staging-only tool out of production by script, not by memory: CI blocks it on the production branch, and a release script cuts the branch, removes the tool, refuses if any trace remains, and runs every test before opening the pull request. Added Terraform for the Azure footprint and a smoke test of the live pages, redirects, robots file and sitemap after every deploy.</li>
+          <li data-tags="delivery">More than 100 automated tests, including browser tests that click the real forms and measure real page layout.</li>
+        </ul>
+      </div>
+    </article>
 
     <article class="role">
       <p class="when">Aug 2026 – Nov 2026</p>
@@ -317,11 +337,11 @@ h2.section {
       </section>
       <section class="skill-group" data-lens-match="platform">
         <h3>Backend and platform</h3>
-        <p>C# and .NET, Python (FastAPI, SQLAlchemy, Pydantic), TypeScript, SQL Server, PostgreSQL, REST APIs, ETL pipelines, asynchronous messaging with Azure Service Bus and dead-letter handling, JWT authentication with key rotation, rate limiting, hexagonal microservices.</p>
+        <p>C# and .NET, Python (FastAPI, SQLAlchemy, Pydantic), TypeScript, SQL Server, PostgreSQL, REST APIs, Node.js, Stripe payments and webhooks, transactional email, ETL pipelines, asynchronous messaging with Azure Service Bus and dead-letter handling, JWT authentication with key rotation, rate limiting, hexagonal microservices.</p>
       </section>
       <section class="skill-group" data-lens-match="platform">
         <h3>Cloud-native and infrastructure</h3>
-        <p>Docker, Kubernetes, Azure (Container Apps, Key Vault, DevOps, APIM, Application Insights), Terraform, Bicep, GitHub Actions with OIDC deployment, CI/CD.</p>
+        <p>Docker, Kubernetes, Azure (Container Apps, Static Web Apps, Key Vault, DevOps, APIM, Application Insights), Cloudflare, Terraform, Bicep, GitHub Actions with OIDC deployment, CI/CD.</p>
       </section>
       <section class="skill-group" data-lens-match="delivery">
         <h3>Quality and delivery</h3>
@@ -339,10 +359,10 @@ h2.section {
 
     <h2 class="section">Education and teaching</h2>
     <p>University of Northern Iowa, class of 2019: B.A. in Computer Science and B.A. in Music, with an emphasis in composition.</p>
-    <p>Music instructor at Zoom Twin Cities Music School from February 2023 to October 2025. Top-rated, with 5 of 7 students retained for a year or more. Teaching taught me to meet people where they are, which carries straight into mentoring engineers and explaining technical change to leadership.</p>
+    <p>Music instructor at Zoom Twin Cities Music School from February 2023 to October 2025; the school became my first freelance client in November 2026. Top-rated, with 5 of 7 students retained for a year or more. Teaching taught me to meet people where they are, which carries straight into mentoring engineers and explaining technical change to leadership.</p>
 
     <div class="closing">
-      <p>Want the details behind any of this? <a href="mailto:Alexander.V.Wilkening@gmail.com">Email me</a>.</p>
+      <p>Want the details behind any of this, or have a project of your own? <a href="mailto:Alexander.V.Wilkening@gmail.com">Email me</a>.</p>
     </div>
   </main>
 </div>
@@ -350,8 +370,8 @@ h2.section {
 <script>
 (function () {
   var lenses = {
-    "all": "Seven years building production systems, learning why delivery breaks, and bringing AI agents into the work in ways that can be checked. Pick a view on the left to see only the part of my career that matters to you.",
-    "ai-agents": "Where AI work meets production: prompts measured against real data, workflows that review their own output, and the guardrails that make both trustworthy.",
+    "all": "Seven years building production systems, learning why delivery breaks, and bringing AI agents into the work in ways that can be checked. Now taking on freelance clients, starting with a music school I once taught for. Pick a view on the left to see only the part of my career that matters to you.",
+    "ai-agents": "Where AI work meets production: prompts measured against real data, workflows that review their own output, a client-facing agent that edits a live website, and the guardrails that make all of it trustworthy.",
     "delivery": "Why work stalls and what actually changes it: smaller units of work, evidence from research and from the team, and the conversations with leadership that get change adopted.",
     "platform": "The plumbing that keeps software running: cloud infrastructure, pipelines, messaging that survives failure, and migrations that finally ship.",
     "domains": "Mortgage, billing, payments, and logistics: regulated, correctness-sensitive work where the software has to match how the process really runs."
